@@ -3,6 +3,7 @@
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
+import type { MotionValue } from "motion/react";
 
 /** A single cupped petal, base at the origin, growing up +Y, concave side facing -Z (toward the flower centre). */
 function makePetalGeometry(cup = 0.55, curl = 0.35) {
@@ -26,7 +27,7 @@ function makePetalGeometry(cup = 0.55, curl = 0.35) {
 const ROSE_PETALS = 34;
 const golden = Math.PI * (3 - Math.sqrt(5));
 
-function Rose({ x, y = -0.2, size = 1.15 }: { x: number; y?: number; size?: number }) {
+function Rose({ x, y = -0.2, size = 1.15, ready, scroll }: { x: number; y?: number; size?: number; ready: boolean; scroll?: MotionValue<number> }) {
   const group = useRef<THREE.Group>(null);
   const petals = useRef<(THREE.Mesh | null)[]>([]);
   const start = useRef<number | null>(null);
@@ -66,9 +67,12 @@ function Rose({ x, y = -0.2, size = 1.15 }: { x: number; y?: number; size?: numb
   );
 
   useFrame((state) => {
-    if (start.current === null) start.current = state.clock.elapsedTime;
-    const elapsed = state.clock.elapsedTime - start.current;
-    const p = 1 - Math.pow(1 - Math.min(1, elapsed / 4), 3);
+    if (!ready) start.current = null;
+    else if (start.current === null) start.current = state.clock.elapsedTime;
+    const elapsed = start.current === null ? 0 : state.clock.elapsedTime - start.current;
+    const s = scroll?.get() ?? 0;
+    // bloom on load, then bloom further as you scroll
+    const p = Math.min(1.35, 1 - Math.pow(1 - Math.min(1, elapsed / 4), 3) + s * 0.45);
     const breathe = Math.sin(state.clock.elapsedTime * 0.8) * 0.03;
     petals.current.forEach((m, i) => {
       if (!m) return;
@@ -78,10 +82,11 @@ function Rose({ x, y = -0.2, size = 1.15 }: { x: number; y?: number; size?: numb
     if (group.current) {
       const px = state.pointer.x;
       const py = state.pointer.y;
-      group.current.rotation.y = state.clock.elapsedTime * 0.12 + px * 0.25;
-      group.current.rotation.x = 0.38 - py * 0.12;
-      group.current.position.x = THREE.MathUtils.lerp(group.current.position.x, x, 0.05);
-      group.current.position.y = y + Math.sin(state.clock.elapsedTime * 0.6) * 0.05;
+      group.current.rotation.y = state.clock.elapsedTime * 0.12 + px * 0.25 + s * 2.4;
+      group.current.rotation.x = 0.38 - py * 0.12 + s * 0.6;
+      group.current.position.x = THREE.MathUtils.lerp(group.current.position.x, x * (1 - s * 0.8), 0.06);
+      group.current.position.y = y + Math.sin(state.clock.elapsedTime * 0.6) * 0.05 + s * 0.9;
+      group.current.scale.setScalar(size * (1 + s * 0.7));
     }
   });
 
@@ -170,7 +175,7 @@ function FallingPetals() {
   );
 }
 
-export default function RoseScene({ roseX, active = true, compact = false }: { roseX: number; active?: boolean; compact?: boolean }) {
+export default function RoseScene({ roseX, active = true, compact = false, ready = true, scroll }: { roseX: number; active?: boolean; compact?: boolean; ready?: boolean; scroll?: MotionValue<number> }) {
   return (
     <Canvas
       dpr={[1, 1.75]}
@@ -184,7 +189,7 @@ export default function RoseScene({ roseX, active = true, compact = false }: { r
       <directionalLight position={[3, 5, 4]} intensity={2.2} color="#fff6ea" />
       <directionalLight position={[-4, 1, -2]} intensity={0.9} color="#ffc0d4" />
       <pointLight position={[0, 1.4, 1.5]} intensity={2} color="#ffd6e2" distance={6} />
-      <Rose x={roseX} y={compact ? 0.8 : -0.3} size={compact ? 0.55 : 1.15} />
+      <Rose x={roseX} y={compact ? 0.8 : -0.3} size={compact ? 0.55 : 1.15} ready={ready} scroll={scroll} />
       <FallingPetals />
     </Canvas>
   );

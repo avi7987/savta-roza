@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useInView } from "motion/react";
+import { AnimatePresence, motion, useInView, useScroll, useSpring, useTransform } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { CalendarHeart, Check, Home, Play, Users, Wand2 } from "lucide-react";
 import { useLang } from "@/lib/i18n";
@@ -14,6 +14,14 @@ export default function VideoInsight() {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { margin: "-20% 0px" });
   const [p, setP] = useState(0);
+  const stage = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: stage, offset: ["start end", "start 25%"] });
+  const sp = useSpring(scrollYProgress, { stiffness: 90, damping: 20 });
+  const scale = useTransform(sp, [0, 1], [0.72, 1]);
+  const rotateX = useTransform(sp, [0, 1], [28, 0]);
+  const radius = useTransform(sp, [0, 1], [80, 32]);
+  const panelX = useTransform(sp, [0.4, 1], [120, 0]);
+  const panelO = useTransform(sp, [0.4, 1], [0, 1]);
 
   useEffect(() => {
     if (!inView) return;
@@ -34,16 +42,14 @@ export default function VideoInsight() {
   const added = p > 0.78;
 
   return (
-    <section id="videos" className="relative overflow-hidden py-28">
+    <section id="videos" className="relative z-10 overflow-hidden py-28">
       <SectionHead title={t.video.title} sub={t.video.sub} />
-      <div ref={ref} className="mx-auto mt-14 grid max-w-6xl gap-6 px-5 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <div ref={stage} className="mx-auto mt-14 grid max-w-6xl gap-6 px-5 [perspective:1400px] lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
         {/* player */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-          className="relative overflow-hidden rounded-[2rem] bg-ink shadow-[0_40px_100px_-40px_rgba(163,22,74,0.6)]"
+          ref={ref}
+          style={{ scale, rotateX, borderRadius: radius }}
+          className="relative origin-bottom overflow-hidden bg-ink shadow-[0_40px_100px_-40px_rgba(163,22,74,0.6)]"
         >
           <motion.div animate={{ scale: 1 + p * 0.12 }} transition={{ ease: "linear", duration: 0.1 }} className="aspect-video">
             <PhotoFill seed={5} className="h-full w-full" />
@@ -76,7 +82,7 @@ export default function VideoInsight() {
         </motion.div>
 
         {/* AI panel */}
-        <div className="flex flex-col gap-4">
+        <motion.div style={{ x: panelX, opacity: panelO }} className="flex flex-col gap-4">
           <div className="rounded-[2rem] bg-white p-6 ring-1 ring-ink/5 shadow-[0_20px_60px_-30px_rgba(42,31,36,0.3)]">
             <h3 className="mb-3 text-sm font-medium tracking-wide text-ink-soft">{t.video.transcript}</h3>
             <ul className="flex flex-col gap-2">
@@ -132,7 +138,7 @@ export default function VideoInsight() {
               )}
             </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   );

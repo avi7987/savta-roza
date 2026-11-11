@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { TLink } from "./Transition";
+import { Magnetic } from "./fx";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 
@@ -48,8 +49,10 @@ export function FadeIn({ children, className, delay = 0, y = 24 }: { children: R
 /** Pill button with a moving light sheen (Magic UI "ShimmerButton" style). */
 export function ShimmerLink({ href, children, className }: { href: string; children: ReactNode; className?: string }) {
   return (
-    <Link
+    <Magnetic>
+    <TLink
       href={href}
+      data-cursor=""
       className={cn(
         "group relative inline-flex min-h-12 items-center justify-center gap-2 overflow-hidden rounded-full bg-gradient-to-br from-rosa to-rosa-deep px-7 py-3 text-base font-medium text-white shadow-[0_10px_30px_-10px_rgba(224,69,123,0.7)] transition-transform duration-300 hover:scale-[1.03] active:scale-[0.98]",
         className
@@ -57,7 +60,8 @@ export function ShimmerLink({ href, children, className }: { href: string; child
     >
       <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/3 animate-shimmer bg-gradient-to-r from-transparent via-white/40 to-transparent" />
       <span className="relative flex items-center gap-2">{children}</span>
-    </Link>
+    </TLink>
+    </Magnetic>
   );
 }
 

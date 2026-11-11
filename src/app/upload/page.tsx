@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { TLink } from "@/components/Transition";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
 import { ArrowRight, Check, ImagePlus, X } from "lucide-react";
@@ -45,9 +45,9 @@ export default function UploadPage() {
       </div>
 
       <header className="relative z-10 mx-auto flex max-w-2xl items-center justify-between gap-3 px-5 pt-6">
-        <Link href="/" aria-label={u.home} className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 ring-1 ring-ink/10 backdrop-blur">
+        <TLink href="/" aria-label={u.home} className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 ring-1 ring-ink/10 backdrop-blur">
           <ArrowRight className={cn("h-5 w-5", dir === "ltr" && "rotate-180")} aria-hidden />
-        </Link>
+        </TLink>
         <LangToggle compact />
       </header>
 
@@ -194,10 +194,10 @@ export default function UploadPage() {
                 >
                   {u.another}
                 </button>
-                <Link href="/" className="inline-flex min-h-12 items-center gap-2 rounded-full bg-white px-6 text-ink ring-1 ring-ink/10">
+                <TLink href="/" className="inline-flex min-h-12 items-center gap-2 rounded-full bg-white px-6 text-ink ring-1 ring-ink/10">
                   <RoseMark className="h-5 w-5 text-rosa" />
                   {u.home}
-                </Link>
+                </TLink>
               </div>
             </motion.div>
           )}

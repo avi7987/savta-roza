@@ -67,7 +67,7 @@ export default function HelpSwipe() {
   };
 
   return (
-    <section id="help" className="relative bg-gradient-to-b from-cream to-blush/60 py-28">
+    <section id="help" className="relative z-10 bg-gradient-to-b from-cream to-blush/60 py-28">
       <SectionHead title={t.help.title} sub={t.help.sub} />
       <div className="mx-auto mt-14 grid max-w-5xl items-center gap-10 px-5 md:grid-cols-2">
         <div className="relative mx-auto aspect-[4/5] w-full max-w-sm">

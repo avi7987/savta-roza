@@ -1,6 +1,6 @@
 import Header from "@/components/Header";
 import Hero from "@/components/Hero";
-import Memories from "@/components/Memories";
+import Memories, { WordsBand } from "@/components/Memories";
 import Timeline from "@/components/Timeline";
 import Album from "@/components/Album";
 import VideoInsight from "@/components/VideoInsight";
@@ -14,6 +14,7 @@ export default function Home() {
       <main>
         <Hero />
         <Memories />
+        <WordsBand />
         <Timeline />
         <Album />
         <VideoInsight />

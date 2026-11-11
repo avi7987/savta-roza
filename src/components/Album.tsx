@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useMotionValue, useSpring } from "motion/react";
+import { AnimatePresence, motion, useInView, useMotionValue, useSpring } from "motion/react";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { RotateCw } from "lucide-react";
 import { useLang } from "@/lib/i18n";
@@ -8,8 +8,9 @@ import { PhotoFill, SectionHead, cn } from "./ui";
 
 type Photo = { cap: string; decade: string; by: string; seed: number };
 
-function Polaroid({ p, x, y, rot, w, i, label, backLabel, flipLabel, constraints }: {
+function Polaroid({ p, x, y, rot, w, i, label, backLabel, flipLabel, constraints, dx, dy, live, cursor }: {
   p: Photo; x: number; y: number; rot: number; w: number; i: number; label: string; backLabel: string; flipLabel: string;
+  dx: number; dy: number; live: boolean; cursor: string;
   constraints: React.RefObject<HTMLDivElement | null>;
 }) {
   const [flipped, setFlipped] = useState(false);
@@ -35,10 +36,11 @@ function Polaroid({ p, x, y, rot, w, i, label, backLabel, flipLabel, constraints
         setZ(100 + Date.now() % 1000);
       }}
       onDragEnd={() => setTimeout(() => (dragging.current = false), 50)}
-      initial={{ opacity: 0, scale: 0.6, rotate: rot * 3, y: 80 }}
-      animate={{ opacity: 1, scale: 1, rotate: rot, y: 0 }}
-      exit={{ opacity: 0, scale: 0.7 }}
-      transition={{ type: "spring", stiffness: 120, damping: 16, delay: i * 0.07 }}
+      data-cursor={cursor}
+      initial={{ opacity: 0, scale: 0.5, rotate: rot * 4 + (i % 2 ? 30 : -30), x: dx, y: dy }}
+      animate={live ? { opacity: 1, scale: 1, rotate: rot, x: 0, y: 0 } : undefined}
+      exit={{ opacity: 0, scale: 0.5, y: 60, transition: { duration: 0.3 } }}
+      transition={{ type: "spring", stiffness: 90, damping: 14, delay: i * 0.09 }}
       whileHover={{ scale: 1.06 }}
       whileDrag={{ scale: 1.1, cursor: "grabbing" }}
       className="absolute cursor-grab touch-none"
@@ -87,6 +89,7 @@ export default function Album() {
   const table = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1100);
   const [filter, setFilter] = useState<string | null>(null);
+  const live = useInView(table, { once: true, margin: "-20% 0px" });
 
   useEffect(() => {
     const el = table.current;
@@ -107,7 +110,7 @@ export default function Album() {
   const height = Math.max(rows * rowH + 80, 420);
 
   return (
-    <section id="album" className="relative py-28">
+    <section id="album" className="relative z-10 py-28">
       <SectionHead title={t.album.title} sub={t.album.sub} />
 
       <div className="mx-auto mt-10 flex max-w-6xl flex-wrap justify-center gap-2 px-5" role="group" aria-label={t.album.title}>
@@ -156,6 +159,10 @@ export default function Album() {
                   backLabel={t.album.back}
                   flipLabel={t.album.flip}
                   constraints={table}
+                  dx={width / 2 - (x + w / 2)}
+                  dy={height / 2 - (y + rowH / 2)}
+                  live={live}
+                  cursor={t.album.cursor}
                 />
               );
             })}
