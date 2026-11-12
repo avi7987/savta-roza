@@ -26,7 +26,7 @@ export function cloudStore<T extends Base>(collection: string, db: D1Like, files
           thumb = `${crypto.randomUUID()}.jpg`;
           await files.put(key(id, thumb), f.thumb, { httpMetadata: { contentType: "image/jpeg" } });
         }
-        stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category });
+        stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category, sha: f.sha, phash: f.phash });
       }
       const record = { ...fields, id, status: "pending", createdAt: new Date().toISOString(), files: stored } as T;
       await db

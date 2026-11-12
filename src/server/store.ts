@@ -23,6 +23,9 @@ export type StoredFile = {
   /** when it was taken, and how we know */
   date?: PhotoDate;
   category?: CategoryId;
+  /** fingerprints for recognising the same photo twice (see lib/dedupe) */
+  sha?: string;
+  phash?: string;
 };
 
 export type Base = { id: string; status: Status; files: StoredFile[]; createdAt: string; reviewedAt?: string };
@@ -65,6 +68,8 @@ export type NewFile = {
   height?: number;
   date?: PhotoDate;
   category?: CategoryId;
+  sha?: string;
+  phash?: string;
 };
 
 export interface Store<T extends Base> {

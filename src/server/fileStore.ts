@@ -51,7 +51,7 @@ export function fileStore<T extends Base>(collection: string): Store<T> {
             thumb = `${randomUUID()}.jpg`;
             await writeFile(path.join(dir, thumb), f.thumb);
           }
-          stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category });
+          stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category, sha: f.sha, phash: f.phash });
         }
         const record = { ...fields, id, status: "pending", createdAt: new Date().toISOString(), files: stored } as T;
         const all = await read();

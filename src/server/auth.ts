@@ -15,11 +15,12 @@ export async function isAdmin(req: Request) {
 
 const hits = new Map<string, number[]>();
 /** A light per-visitor limit on submissions: at most `max` in `windowMs`. */
-export function rateLimited(req: Request, max = 6, windowMs = 10 * 60 * 1000) {
+export function rateLimited(req: Request, max = 6, windowMs = 10 * 60 * 1000, bucket = "submit") {
   const ip = req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
   const now = Date.now();
-  const recent = (hits.get(ip) ?? []).filter((t) => now - t < windowMs);
+  const key = `${bucket}:${ip}`;
+  const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
   recent.push(now);
-  hits.set(ip, recent);
+  hits.set(key, recent);
   return recent.length > max;
 }

@@ -15,7 +15,10 @@ import type { CategoryId } from "@/content/types";
 import { useFamily } from "./family/useFamily";
 import PersonAvatar from "./family/PersonAvatar";
 
-type Picked = { file: File; url?: string; kind: "image" | "video" | "audio"; prep?: Prepared; preparing?: boolean };
+type Dup = { match: "exact" | "similar"; status: "approved" | "pending" } | "local";
+type Picked = { file: File; url?: string; kind: "image" | "video" | "audio"; prep?: Prepared; preparing?: boolean; dup?: Dup | null };
+/** copies that are not sent: the exact same file already on the site, or picked twice */
+const blocked = (f: Picked) => f.dup === "local" || (!!f.dup && f.dup.match === "exact");
 type WhenMode = "unknown" | "date" | "year" | "decade";
 const DECADES = [1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
 const CATS: CategoryId[] = ["family", "childhood", "celebrations", "travel", "moments", "grandchildren"];
@@ -54,6 +57,7 @@ export default function MemorySubmissionForm() {
   const [tagged, setTagged] = useState<string[]>([]);
   const [when, setWhen] = useState<{ mode: WhenMode; date: string; year: string; decade?: number }>({ mode: "unknown", date: "", year: "" });
   const [category, setCategory] = useState<CategoryId | "">("");
+  const [skipped, setSkipped] = useState(0);
   const fam = useFamily();
   const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
   const tagOptions = fam.graph.people.filter((p) => !p.placeholder).sort((a, b) => (fam.graph.ring(a.id) ?? 9) - (fam.graph.ring(b.id) ?? 9));
@@ -82,14 +86,28 @@ export default function MemorySubmissionForm() {
       .forEach((p) =>
         prepare(p.file)
           .catch(() => ({}))
-          .then((prep) => setFiles((cur) => cur.map((x) => (x.file === p.file ? { ...x, prep, preparing: false } : x))))
+          .then(async (prep: Prepared) => {
+            // ask the site whether this photo is already there
+            let dup: Dup | null = null;
+            if (!STATIC && (prep.sha || prep.phash)) {
+              try {
+                const r = await fetch("/api/photos/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: [{ sha: prep.sha, phash: prep.phash }] }) });
+                dup = r.ok ? ((await r.json()).results?.[0] ?? null) : null;
+              } catch {}
+            }
+            setFiles((cur) => {
+              const twice = !!prep.sha && cur.some((x) => x.file !== p.file && x.prep?.sha === prep.sha && !blocked(x));
+              return cur.map((x) => (x.file === p.file ? { ...x, prep, preparing: false, dup: twice ? "local" : dup } : x));
+            });
+          })
       );
   };
 
   const validate = () => {
     const e: Record<string, string> = {};
     if (!values.name.trim()) e.name = s.errors.name;
-    if (!values.memory.trim() && files.length === 0) e.memory = s.errors.memory;
+    const sendable = files.filter((f) => !blocked(f));
+    if (!values.memory.trim() && sendable.length === 0) e.memory = files.length ? s.errors.allDup : s.errors.memory;
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -108,11 +126,12 @@ export default function MemorySubmissionForm() {
     }
     const fd = new FormData(ev.currentTarget);
     fd.delete("files");
-    files.forEach((f, i) => {
+    const sendable = files.filter((f) => !blocked(f));
+    sendable.forEach((f, i) => {
       fd.append("files", f.file);
       if (f.prep?.thumb) fd.append(`thumb-${i}`, f.prep.thumb, "thumb.jpg");
     });
-    fd.set("filesMeta", JSON.stringify(files.map((f) => ({ date: f.prep?.date, width: f.prep?.width, height: f.prep?.height }))));
+    fd.set("filesMeta", JSON.stringify(sendable.map((f) => ({ date: f.prep?.date, width: f.prep?.width, height: f.prep?.height, sha: f.prep?.sha, phash: f.prep?.phash }))));
     fd.set("when", JSON.stringify({ mode: when.mode, date: when.date, year: Number(when.year) || undefined, decade: when.decade }));
     if (category) fd.set("category", category);
     try {
@@ -121,7 +140,13 @@ export default function MemorySubmissionForm() {
         setState("full");
         return;
       }
+      if (res.status === 409) {
+        setErrors({ memory: s.errors.allDup });
+        setState("idle");
+        return;
+      }
       if (!res.ok) throw new Error(String(res.status));
+      setSkipped(((await res.json().catch(() => ({}))).skipped ?? 0) + (files.length - sendable.length));
       setState("done");
     } catch {
       setState("error");
@@ -132,6 +157,7 @@ export default function MemorySubmissionForm() {
     setValues({ name: "", relation: "", title: "", memory: "" });
     setFiles([]);
     setTagged([]);
+    setSkipped(0);
     setWhen({ mode: "unknown", date: "", year: "" });
     setCategory("");
     setErrors({});
@@ -148,6 +174,7 @@ export default function MemorySubmissionForm() {
           <h2 className="font-display text-[clamp(2rem,4vw,2.8rem)] font-light text-burgundy">{s.doneTitle}</h2>
           <p className="max-w-md text-lg text-ink-soft">{s.doneLead}</p>
           {STATIC && <p className="max-w-md text-[0.88rem] text-rose">{s.demoNote}</p>}
+          {skipped > 0 && <p className="max-w-md text-[0.92rem] text-ink-soft">{s.skipped(skipped)}</p>}
           <button type="button" onClick={reset} className={cn(buttonClass.secondary, "mt-4")}>
             {s.another}
           </button>
@@ -232,7 +259,7 @@ export default function MemorySubmissionForm() {
             {files.length > 0 && (
               <ul className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-5">
                 {files.map((f, i) => (
-                  <li key={`${f.file.name}-${i}`} className="group relative aspect-square overflow-hidden rounded-[var(--radius-photo)] bg-mount shadow-[var(--shadow-paper)]">
+                  <li key={`${f.file.name}-${i}`} className={cn("group relative aspect-square overflow-hidden rounded-[var(--radius-photo)] bg-mount shadow-[var(--shadow-paper)]", blocked(f) && "opacity-60 grayscale")}>
                     {f.url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={f.url} alt={f.file.name} className="h-full w-full object-cover" />
@@ -242,7 +269,12 @@ export default function MemorySubmissionForm() {
                         <span className="line-clamp-2 break-all">{f.file.name}</span>
                       </span>
                     )}
-                    {f.kind !== "audio" && (
+                    {f.dup && (
+                      <span className={cn("absolute inset-x-0 top-0 px-1.5 py-1 text-center text-[0.66rem] leading-tight text-white", blocked(f) ? "bg-charcoal/80" : "bg-[#9a6a1c]/90")}>
+                        {f.dup === "local" ? s.dupLocal : f.dup.match === "exact" ? (f.dup.status === "pending" ? s.dupPending : s.dupExact) : s.dupSimilar}
+                      </span>
+                    )}
+                    {f.kind !== "audio" && !blocked(f) && (
                       <span className="absolute inset-x-1 bottom-1 truncate rounded bg-white/90 px-1.5 py-0.5 text-center text-[0.68rem] text-charcoal">
                         {f.preparing ? "…" : f.prep?.date ? `${formatDate({ source: "exif", date: f.prep.date }, lang)} · ${s.fromFile}` : s.noDate}
                       </span>
@@ -259,6 +291,7 @@ export default function MemorySubmissionForm() {
                 ))}
               </ul>
             )}
+            {files.some((f) => f.dup && f.dup !== "local" && f.dup.match === "similar") && <p className="text-[0.82rem] text-[#7a5212]">{s.dupSimilarHint}</p>}
           </Field>
 
           {files.some((f) => f.kind !== "audio") && (

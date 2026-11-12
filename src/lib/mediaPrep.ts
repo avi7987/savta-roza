@@ -6,7 +6,7 @@
   keeps the gallery fast and is what the date-estimating model looks at.
 */
 
-export type Prepared = { date?: string; width?: number; height?: number; thumb?: Blob };
+export type Prepared = { date?: string; width?: number; height?: number; thumb?: Blob; sha?: string; phash?: string };
 
 const THUMB_EDGE = 720;
 
@@ -84,6 +84,29 @@ function scaleTo(w: number, h: number) {
   return [Math.round(w * k), Math.round(h * k)];
 }
 
+/** exact-file fingerprint */
+export async function sha256(blob: Blob) {
+  const d = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** what-it-looks-like fingerprint: 9x8 grey, compare neighbours → 64 bits as 16 hex digits */
+function dhash(src: CanvasImageSource) {
+  const c = document.createElement("canvas");
+  c.width = 9;
+  c.height = 8;
+  const g = c.getContext("2d", { willReadFrequently: true })!;
+  g.drawImage(src, 0, 0, 9, 8);
+  const px = g.getImageData(0, 0, 9, 8).data;
+  const lum = (x: number, y: number) => {
+    const i = (y * 9 + x) * 4;
+    return px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114;
+  };
+  let bits = "";
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) bits += lum(x, y) > lum(x + 1, y) ? "1" : "0";
+  return BigInt(`0b${bits}`).toString(16).padStart(16, "0");
+}
+
 const toJpeg = (canvas: HTMLCanvasElement) => new Promise<Blob | undefined>((res) => canvas.toBlob((b) => res(b ?? undefined), "image/jpeg", 0.82));
 
 async function imageThumb(file: File) {
@@ -94,7 +117,7 @@ async function imageThumb(file: File) {
     c.width = w;
     c.height = h;
     c.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
-    return { width: bmp.width, height: bmp.height, thumb: await toJpeg(c) };
+    return { width: bmp.width, height: bmp.height, thumb: await toJpeg(c), phash: dhash(c) };
   } catch {
     return {}; // e.g. HEIC in browsers that cannot decode it
   }
@@ -123,7 +146,7 @@ async function videoThumb(file: File) {
     c.width = w;
     c.height = h;
     c.getContext("2d")!.drawImage(v, 0, 0, w, h);
-    return { width: v.videoWidth, height: v.videoHeight, thumb: await toJpeg(c) };
+    return { width: v.videoWidth, height: v.videoHeight, thumb: await toJpeg(c), phash: dhash(c) };
   } catch {
     return {};
   } finally {
@@ -132,15 +155,16 @@ async function videoThumb(file: File) {
 }
 
 export async function prepare(file: File): Promise<Prepared> {
+  const sha = await sha256(file).catch(() => undefined);
   if (file.type.startsWith("image/")) {
     const [date, t] = await Promise.all([exifDate(file).catch(() => undefined), imageThumb(file)]);
-    return { date, ...t };
+    return { date, sha, ...t };
   }
   if (file.type.startsWith("video/")) {
     const [date, t] = await Promise.all([videoDate(file).catch(() => undefined), videoThumb(file)]);
-    return { date, ...t };
+    return { date, sha, ...t };
   }
-  return {};
+  return { sha };
 }
 
 /** A small JPEG from an already-loaded image (used by the moderation page for older uploads). */
@@ -151,5 +175,5 @@ export async function thumbFromBlob(blob: Blob) {
   c.width = w;
   c.height = h;
   c.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
-  return { width: bmp.width, height: bmp.height, thumb: await toJpeg(c) };
+  return { width: bmp.width, height: bmp.height, thumb: await toJpeg(c), phash: dhash(c) };
 }

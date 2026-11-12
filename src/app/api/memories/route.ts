@@ -9,6 +9,8 @@ import { analyzeMemory, later } from "@/server/analyze";
 import { cleanDate, type PhotoDate } from "@/lib/photoDate";
 import type { CategoryId } from "@/content/types";
 import type { NewFile } from "@/server/store";
+import { isPhash, isSha } from "@/lib/dedupe";
+import { findDuplicates } from "@/server/dupes";
 
 const CATEGORIES: CategoryId[] = ["family", "childhood", "celebrations", "travel", "moments", "grandchildren"];
 
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
   const userDate = whenFromForm(clean(form.get("when"), 200));
   const cat = clean(form.get("category"), 20) as CategoryId;
   const category = CATEGORIES.includes(cat) ? cat : undefined;
-  let meta: { date?: string; width?: number; height?: number }[] = [];
+  let meta: { date?: string; width?: number; height?: number; sha?: string; phash?: string }[] = [];
   try {
     meta = JSON.parse(clean(form.get("filesMeta"), 4000) || "[]");
   } catch {}
@@ -109,10 +111,27 @@ export async function POST(req: Request) {
     const m = meta[i] ?? {};
     const dim = (n: unknown) => (Number.isFinite(Number(n)) && Number(n) > 0 && Number(n) < 20000 ? Math.round(Number(n)) : undefined);
     const exif = cleanDate({ date: m.date }, "exif");
-    files.push({ data, ext: found.ext, kind: found.kind, thumb, width: dim(m.width), height: dim(m.height), date: found.kind === "audio" ? userDate : (userDate ?? exif), category: found.kind === "audio" ? undefined : category });
+    files.push({ data, ext: found.ext, kind: found.kind, thumb, sha: isSha(m.sha) ? m.sha : undefined, phash: isPhash(m.phash) ? m.phash : undefined, width: dim(m.width), height: dim(m.height), date: found.kind === "audio" ? userDate : (userDate ?? exif), category: found.kind === "audio" ? undefined : category });
   }
 
   if (errors.length) return NextResponse.json({ error: "invalid", fields: Array.from(new Set(errors)) }, { status: 422 });
+
+  // the same photo is never stored twice: drop exact copies of anything already on the site, or repeated in this upload
+  const hits = await findDuplicates(files);
+  const seen = new Set<string>();
+  const skipped = files.filter((f, i) => {
+    const dup = hits[i]?.match === "exact" || (!!f.sha && seen.has(f.sha));
+    if (f.sha) seen.add(f.sha);
+    return dup;
+  }).length;
+  const seen2 = new Set<string>();
+  const fresh = files.filter((f, i) => {
+    const dup = hits[i]?.match === "exact" || (!!f.sha && seen2.has(f.sha));
+    if (f.sha) seen2.add(f.sha);
+    return !dup;
+  });
+  files.splice(0, files.length, ...fresh);
+  if (skipped && !files.length && !body) return NextResponse.json({ error: "duplicate", skipped }, { status: 409 });
   // storage stays inside the free tier: past the cap, files are refused (text still is welcome)
   if (!(await canStore(files.reduce((s, f) => s + f.data.byteLength, 0)))) return NextResponse.json({ error: "full" }, { status: 507 });
 
@@ -121,5 +140,5 @@ export async function POST(req: Request) {
   // estimate dates for undated photos (and check "dated" scans) after answering the visitor
   if (files.some((f) => f.kind !== "audio" && f.date?.source !== "user")) await later(analyzeMemory(saved.id));
   // new memories wait for a moderator; nothing is published automatically
-  return NextResponse.json({ ok: true, id: saved.id, status: saved.status }, { status: 201 });
+  return NextResponse.json({ ok: true, id: saved.id, status: saved.status, skipped }, { status: 201 });
 }

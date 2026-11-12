@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { CategoryId } from "@/content/types";
 import { cleanDate } from "@/lib/photoDate";
+import { isPhash, isSha } from "@/lib/dedupe";
 import { isAdmin } from "@/server/auth";
 import { store } from "@/server/store";
 
@@ -17,7 +18,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as {
     status?: string;
-    files?: { name: string; date?: { date?: string; year?: number; from?: number; to?: number } | null; category?: string }[];
+    files?: { name: string; date?: { date?: string; year?: number; from?: number; to?: number } | null; category?: string; sha?: string; phash?: string }[];
   };
   const { status } = body;
   if (status !== undefined && status !== "approved" && status !== "rejected" && status !== "pending") return NextResponse.json({ error: "status" }, { status: 400 });
@@ -34,7 +35,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         if (!e) return f;
         const date = e.date === null ? undefined : e.date ? cleanDate(e.date, "user") ?? f.date : f.date;
         const category = e.category === "" ? undefined : CATEGORIES.includes(e.category as CategoryId) ? (e.category as CategoryId) : f.category;
-        return { ...f, date, category };
+        return { ...f, date, category, sha: f.sha ?? (isSha(e.sha) ? e.sha : undefined), phash: f.phash ?? (isPhash(e.phash) ? e.phash : undefined) };
       }),
     }));
   }

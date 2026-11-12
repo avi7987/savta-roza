@@ -9,7 +9,8 @@ import type { Status, StoredFile, StoredMemory, StoredPerson } from "@/server/st
 import { RoseBud } from "@/components/Botanical";
 import { cn } from "@/components/ui";
 import { formatDate, sourceLabel } from "@/lib/photoDate";
-import { thumbFromBlob } from "@/lib/mediaPrep";
+import { sha256, thumbFromBlob } from "@/lib/mediaPrep";
+import { compare } from "@/lib/dedupe";
 import type { CategoryId } from "@/content/types";
 
 const CAT_HE: Record<CategoryId, string> = { family: "משפחה", childhood: "ילדות", celebrations: "חגיגות", travel: "טיולים", moments: "רגעים מיוחדים", grandchildren: "נכדים" };
@@ -107,7 +108,7 @@ const REL: Record<string, string> = { child: "בן/בת של רוזה", grandchi
 const fmtDate = (iso: string) => new Date(iso).toLocaleString("he-IL", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
 /** Files of a submission, fetched with the moderator's password so pending ones can be previewed. */
-function FilePreview({ collection, id, file, token }: { collection: Kind; id: string; file: StoredFile; token: string }) {
+function FilePreview({ collection, id, file, token, onPrints }: { collection: Kind; id: string; file: StoredFile; token: string; onPrints?: (p: { sha?: string; phash?: string }) => void }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
@@ -118,6 +119,10 @@ function FilePreview({ collection, id, file, token }: { collection: Kind; id: st
         if (b && alive) {
           made = URL.createObjectURL(b);
           setUrl(made);
+          // photos uploaded before fingerprints existed get them now, so duplicates can be found
+          if (onPrints && file.kind === "image" && (!file.sha || !file.phash)) {
+            Promise.all([sha256(b).catch(() => undefined), thumbFromBlob(b).then((t) => t.phash).catch(() => undefined)]).then(([sha, phash]) => (sha || phash) && onPrints({ sha, phash }));
+          }
         }
       })
       .catch(() => {});
@@ -125,6 +130,8 @@ function FilePreview({ collection, id, file, token }: { collection: Kind; id: st
       alive = false;
       if (made) URL.revokeObjectURL(made);
     };
+    // runs once per file; the fingerprint callback is only a side note
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collection, id, file.name, token]);
 
   const size = `${(file.size / 1024 / 1024).toFixed(1)}MB`;
@@ -233,6 +240,23 @@ export default function AdminPage() {
     setToast(status === "approved" ? "אושר. זה מופיע עכשיו באתר." : status === "rejected" ? "הוסר. זה לא יופיע באתר, והקבצים שלו נמחקו." : "הוחזר לממתינים.");
     setTimeout(() => setToast(""), 3200);
     load(token);
+  };
+
+  /** another photo on the site (approved or waiting) that this one repeats */
+  const dupOf = (m: StoredMemory, f: StoredFile) => {
+    for (const o of data.memories) {
+      if (o.id === m.id || o.status === "rejected") continue;
+      for (const g of o.files) {
+        const match = compare(f, g);
+        // of two waiting copies, mark only the newer one
+        if (match && !(o.status === "pending" && m.status === "pending" && o.createdAt > m.createdAt)) return { match, other: o };
+      }
+    }
+    return null;
+  };
+  const savePrints = async (memoryId: string, name: string, p: { sha?: string; phash?: string }) => {
+    const r = await fetch(`/api/memories/${memoryId}`, { method: "PATCH", headers: { "x-admin-token": token, "Content-Type": "application/json" }, body: JSON.stringify({ files: [{ name, ...p }] }) });
+    if (r.ok) load(token);
   };
 
   const list = (kind === "memories" ? data.memories : data.family) as Item[];
@@ -404,7 +428,25 @@ export default function AdminPage() {
                         <div className="mt-4 grid gap-3 sm:grid-cols-2">
                           {item.files.map((f) => (
                             <div key={f.name}>
-                              <FilePreview collection={kind} id={item.id} file={f} token={token} />
+                              {kind === "memories" && item.status !== "rejected" && (() => {
+                                const d = dupOf(m, f);
+                                if (!d) return null;
+                                return (
+                                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md bg-[#f6ead2] px-3 py-2 text-sm text-[#6b4a12]">
+                                    <span>
+                                      {d.match === "exact" ? "כפילות: התמונה הזו כבר " : "נראית כמו תמונה ש"}
+                                      {d.other.status === "approved" ? (d.match === "exact" ? "מופיעה באתר" : "כבר מופיעה באתר") : d.match === "exact" ? "נשלחה ומחכה לאישור" : "כבר נשלחה"}
+                                      {` (מאת ${d.other.author})`}
+                                    </span>
+                                    {item.status === "pending" && item.files.length === 1 && (
+                                      <button type="button" disabled={busy} onClick={() => decide(item, "rejected")} className="min-h-9 rounded-full bg-[#6b4a12] px-3 text-white disabled:opacity-50">
+                                        הסרת הכפילות
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                              <FilePreview collection={kind} id={item.id} file={f} token={token} onPrints={kind === "memories" ? (p) => savePrints(item.id, f.name, p) : undefined} />
                               {kind === "memories" && (
                                 <FileMeta
                                   key={`${f.name}-${f.date?.year ?? ""}-${f.date?.source ?? ""}-${f.category ?? ""}`}
