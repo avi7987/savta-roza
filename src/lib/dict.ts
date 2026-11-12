@@ -4,7 +4,7 @@ export type Conf = "exact" | "witness" | "est";
 
 const he = {
   brand: "סבתא רוזה",
-  nav: { life: "ציר החיים", album: "אלבום", videos: "סרטונים", help: "עזרו לזכור" },
+  nav: { life: "ציר החיים", album: "אלבום", videos: "סרטונים", help: "עזרו לזכור", memories: "זיכרונות", menu: "תפריט", close: "סגירה" },
   add: "הוסיפו זיכרון",
   demo: "תצוגה לדוגמה · התוכן יתמלא ממה שהמשפחה תעלה",
   hero: {
@@ -119,7 +119,7 @@ const he = {
 
 const ru: typeof he = {
   brand: "Бабушка Роза",
-  nav: { life: "Жизненный путь", album: "Альбом", videos: "Видео", help: "Помочь вспомнить" },
+  nav: { life: "Жизненный путь", album: "Альбом", videos: "Видео", help: "Помочь вспомнить", memories: "Воспоминания", menu: "Меню", close: "Закрыть" },
   add: "Добавить воспоминание",
   demo: "Пример оформления · сайт наполнится тем, что добавит семья",
   hero: {

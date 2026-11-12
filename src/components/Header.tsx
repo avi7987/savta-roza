@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Menu, Plus, X } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { cn, RoseMark } from "./ui";
 import { Magnetic } from "./fx";
@@ -45,6 +45,29 @@ export default function Header() {
   const [hidden, setHidden] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const lenis = (window as unknown as { __lenis?: { stop: () => void; start: () => void } }).__lenis;
+    if (open) lenis?.stop();
+    else lenis?.start();
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [open]);
+
+  const jump = (id: string) => {
+    setOpen(false);
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      const lenis = (window as unknown as { __lenis?: { start: () => void; scrollTo: (t: HTMLElement, o?: object) => void } }).__lenis;
+      if (!el) return;
+      if (lenis) {
+        lenis.start();
+        lenis.scrollTo(el, { duration: 1.4 });
+      } else el.scrollIntoView({ behavior: "smooth" });
+    }, 350);
+  };
 
   useMotionValueEvent(scrollY, "change", (v) => {
     const prev = scrollY.getPrevious() ?? 0;
@@ -76,6 +99,7 @@ export default function Header() {
   const pill = hovered ?? active;
 
   return (
+    <>
     <motion.header
       initial={{ y: -80, opacity: 0 }}
       animate={ready ? { y: hidden ? -100 : 0, opacity: 1 } : { y: -80, opacity: 0 }}
@@ -120,6 +144,15 @@ export default function Header() {
         </nav>
         <div className="ms-auto flex items-center gap-2">
           <LangToggle compact />
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label={t.nav.menu}
+            aria-expanded={open}
+            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-ink ring-1 ring-ink/10 backdrop-blur lg:hidden"
+          >
+            <Menu className="h-5 w-5" aria-hidden />
+          </button>
           <Magnetic className="hidden sm:inline-flex">
             <TLink
               href="/upload"
@@ -132,5 +165,64 @@ export default function Header() {
         </div>
       </div>
     </motion.header>
+
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="menu"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.nav.menu}
+          data-lenis-prevent
+          initial={{ clipPath: "circle(0% at 90% 4%)" }}
+          animate={{ clipPath: "circle(150% at 90% 4%)" }}
+          exit={{ clipPath: "circle(0% at 90% 4%)" }}
+          transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
+          className="fixed inset-0 z-[80] flex flex-col overflow-y-auto bg-gradient-to-br from-blush via-cream to-[#fbe7d6] px-6 pb-10 pt-6 lg:hidden"
+        >
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-2 text-lg font-bold text-ink">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-rosa">
+                <RoseMark className="h-6 w-6" />
+              </span>
+              {t.brand}
+            </span>
+            <button type="button" onClick={() => setOpen(false)} aria-label={t.nav.close} className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-ink ring-1 ring-ink/10">
+              <X className="h-5 w-5" aria-hidden />
+            </button>
+          </div>
+          <nav aria-label="main" className="mt-12 flex flex-col gap-2">
+            {(["memories", ...SECTIONS] as const).map((id, i) => (
+              <motion.button
+                key={id}
+                type="button"
+                onClick={() => jump(id)}
+                initial={{ opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 + i * 0.07, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                className="group flex items-baseline gap-4 border-b border-ink/10 py-4 text-start"
+              >
+                <span className="text-sm tabular-nums text-rosa">0{i + 1}</span>
+                <span className="text-4xl font-black tracking-tight text-ink transition-colors group-hover:text-rosa-deep sm:text-5xl">
+                  {id === "memories" ? t.nav.memories : labels[id]}
+                </span>
+              </motion.button>
+            ))}
+          </nav>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-auto flex flex-wrap items-center gap-3 pt-10">
+            <TLink
+              href="/upload"
+              onClick={() => setOpen(false)}
+              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-gradient-to-br from-rosa to-rosa-deep px-6 font-medium text-white"
+            >
+              <Plus className="h-5 w-5" aria-hidden />
+              {t.add}
+            </TLink>
+            <LangToggle />
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
