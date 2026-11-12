@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Heart, Pencil, Plus, UserPlus, X } from "lucide-react";
+import { Heart, Pencil, Plus, UserPlus, X } from "lucide-react";
 import { HUSBAND, ROSA } from "@/content/family";
 import type { Photo } from "@/content/types";
 import { pathToRosa, photosOf, photosTogether, radialLayout, ringPath, type TreePerson } from "@/lib/family";
@@ -15,6 +15,7 @@ import { getLenis } from "../Transition";
 import { Container, PlaceholderTag, SectionIntro, buttonClass, cn } from "../ui";
 import FamilyForm, { type FormPreset } from "./FamilyForm";
 import PersonAvatar from "./PersonAvatar";
+import ZoomPan from "./ZoomPan";
 import { useFamily } from "./useFamily";
 
 type Fam = ReturnType<typeof useFamily>;
@@ -37,14 +38,17 @@ function PendingMark() {
 
 /* ---------------- desktop: rings around Rosa, one per generation that exists ---------------- */
 
-function RadialTree({ fam, onOpen, onAdd }: { fam: Fam } & Actions) {
+function RadialTree({ fam, onOpen, onAdd, fixed = false }: { fam: Fam; fixed?: boolean } & Actions) {
   const { t, dir } = useLang();
   const reduce = useReducedMotion();
   const [hover, setHover] = useState<string | null>(null);
   const { graph, nameOf } = fam;
   const { nodes, edges, rings, arc, bounds } = useMemo(() => radialLayout(graph, dir === "rtl"), [graph, dir]);
   const lit = useMemo(() => (hover ? pathToRosa(graph, hover) : null), [graph, hover]);
-  const size = ["w-[clamp(4.2rem,8vw,6rem)]", "w-[clamp(3rem,5.4vw,4.2rem)]", "w-[clamp(2.6rem,4.4vw,3.4rem)]", "w-[clamp(2.2rem,3.8vw,2.9rem)]"];
+  // on phones the drawing has a fixed size and is scaled as a whole, so sizes are fixed too
+  const size = fixed
+    ? ["w-[5.2rem]", "w-[3.6rem]", "w-[3rem]", "w-[2.6rem]"]
+    : ["w-[clamp(4.2rem,8vw,6rem)]", "w-[clamp(3rem,5.4vw,4.2rem)]", "w-[clamp(2.6rem,4.4vw,3.4rem)]", "w-[clamp(2.2rem,3.8vw,2.9rem)]"];
   const empty = graph.generations === 0;
   // with no children yet the drawing is just the centre and an invitation, so keep it compact
   const box = ["max-w-[34rem]", "max-w-[30rem]", "max-w-[50rem]", "max-w-[60rem]"][Math.min(graph.generations, 3)];
@@ -54,7 +58,7 @@ function RadialTree({ fam, onOpen, onAdd }: { fam: Fam } & Actions) {
   const Y = (y: number) => `${((y - b.y) / b.h) * 100}%`;
 
   return (
-    <div className={cn("relative mx-auto w-full transition-[max-width] duration-700", box)} style={{ aspectRatio: `${b.w} / ${b.h}` }} onMouseLeave={() => setHover(null)}>
+    <div className={cn("relative mx-auto w-full transition-[max-width] duration-700", !fixed && box)} style={{ aspectRatio: `${b.w} / ${b.h}` }} onMouseLeave={() => setHover(null)}>
       <svg viewBox={`${b.x * 100} ${b.y * 100} ${b.w * 100} ${b.h * 100}`} className="absolute inset-0 h-full w-full overflow-visible" aria-hidden>
         {empty && <circle cx="50" cy="50" r="38" fill="none" stroke="var(--color-dusty)" strokeOpacity="0.5" strokeWidth="0.25" strokeDasharray="1 1.4" />}
         {rings.slice(1).map((r, i) => (
@@ -188,104 +192,6 @@ function Roots({ fam, onOpen, onAdd }: { fam: Fam } & Actions) {
         </button>
       </div>
       <span aria-hidden className="h-8 w-px bg-gradient-to-b from-line to-transparent" />
-    </div>
-  );
-}
-
-/* ---------------- phones: branches you can open ---------------- */
-
-function Row({ fam, id, onOpen, onAdd, depth }: { fam: Fam; id: string; depth: number } & Actions) {
-  const { t } = useLang();
-  const p = fam.graph.byId.get(id)!;
-  const partner = fam.graph.partnerOf(id);
-  const showPartner = partner && fam.graph.depth(partner.id) === null;
-  const add = childPreset(fam, id);
-  const Who = ({ who }: { who: TreePerson }) => (
-    <button type="button" onClick={() => onOpen(who.id)} aria-label={t.family.open(cap(fam.nameOf(who.id)))} className="flex min-h-12 items-center gap-3 text-start">
-      <PersonAvatar person={who} label={fam.nameOf(who.id)} className={cn(depth === 1 ? "w-11" : "w-9", who.pending && "outline outline-1 outline-offset-2 outline-dashed outline-rose")} />
-      <span className="flex flex-col leading-tight">
-        <span className={cn(depth === 1 ? "font-display text-lg" : "text-[0.95rem]", who.placeholder ? "text-ink-soft" : "text-charcoal")}>{cap(fam.nameOf(who.id))}</span>
-        {who.pending ? <span className="text-[0.72rem] text-rose">{t.family.pending}</span> : !who.placeholder && <span className="text-[0.75rem] text-ink-soft">{fam.relLabel(who.id)}</span>}
-      </span>
-    </button>
-  );
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-      <Who who={p} />
-      {showPartner && (
-        <>
-          <span aria-hidden className="text-dusty">&amp;</span>
-          <Who who={partner} />
-        </>
-      )}
-      {add && (
-        <button type="button" onClick={() => onAdd(add)} aria-label={t.family.addNear(cap(fam.nameOf(id)))} className="flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-dusty/60 text-rose">
-          <Plus className="h-4 w-4" aria-hidden />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function Descendants({ fam, id, depth, ...a }: { fam: Fam; id: string; depth: number } & Actions) {
-  const kids = fam.graph.kids(id);
-  if (!kids.length) return null;
-  return (
-    <ul className="mt-2 flex flex-col gap-2 border-s border-line ps-5">
-      {kids.map((k) => (
-        <li key={k.id}>
-          <Row fam={fam} id={k.id} depth={depth} {...a} />
-          <Descendants fam={fam} id={k.id} depth={depth + 1} {...a} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function BranchList({ fam, ...a }: { fam: Fam } & Actions) {
-  const { t } = useLang();
-  const [open, setOpen] = useState<string | null>(null);
-  const top = fam.graph.kids(ROSA);
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-center gap-6 rounded-[var(--radius-card)] bg-white/70 p-5 shadow-[var(--shadow-paper)]">
-        {[ROSA, fam.graph.rosa.partnerId].filter((id) => id && fam.graph.byId.has(id)).map((id) => (
-          <button key={id} type="button" onClick={() => a.onOpen(id!)} className="flex flex-col items-center gap-2" aria-label={t.family.open(cap(fam.nameOf(id!)))}>
-            <PersonAvatar person={fam.graph.byId.get(id!)!} label={fam.nameOf(id!)} center={id === ROSA} className="w-16" />
-            <span className={cn("text-center leading-tight", id === ROSA ? "font-display text-xl text-burgundy" : "text-[0.9rem] text-ink-soft")}>{cap(fam.nameOf(id!))}</span>
-          </button>
-        ))}
-      </div>
-      {top.length > 0 && <h3 className="label">{t.family.branches}</h3>}
-      <ul className="flex flex-col">
-        {top.map((k) => {
-          const isOpen = open === k.id || (top.length === 1 && open === null);
-          const hasKids = fam.graph.kids(k.id).length > 0;
-          return (
-            <li key={k.id} className="border-b border-line py-3">
-              <div className="flex items-center justify-between gap-3">
-                <Row fam={fam} id={k.id} depth={1} {...a} />
-                {hasKids && (
-                  <button type="button" onClick={() => setOpen(isOpen ? "" : k.id)} aria-expanded={isOpen} aria-label={t.family.branch(cap(fam.nameOf(k.id)))} className="flex h-11 w-11 shrink-0 items-center justify-center text-burgundy">
-                    <ChevronDown className={cn("h-5 w-5 transition-transform duration-300", isOpen && "rotate-180")} strokeWidth={1.4} aria-hidden />
-                  </button>
-                )}
-              </div>
-              <AnimatePresence initial={false}>
-                {isOpen && hasKids && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.45, ease }} className="overflow-hidden">
-                    <Descendants fam={fam} id={k.id} depth={2} {...a} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </li>
-          );
-        })}
-      </ul>
-      <button type="button" onClick={() => a.onAdd({ kind: "child" })} className="flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-dashed border-dusty/60 text-rose">
-        <Plus className="h-5 w-5" aria-hidden />
-        {top.length ? t.family.addChild : t.family.addFirst}
-      </button>
     </div>
   );
 }
@@ -476,8 +382,19 @@ export default function FamilyTree() {
             </ul>
           )}
         </div>
-        <div className="mx-auto max-w-lg md:hidden">
-          <BranchList fam={fam} onOpen={onOpen} onAdd={onAdd} />
+        <div className="md:hidden">
+          <ZoomPan width={[340, 340, 560, 780][Math.min(fam.graph.generations, 3)]}>
+            <div className="px-6 pb-6">
+              <RadialTree fam={fam} onOpen={onOpen} onAdd={onAdd} fixed />
+            </div>
+          </ZoomPan>
+          {fam.graph.generations > 1 && <p className="mt-3 text-center text-[0.82rem] text-ink-soft">{t.family.zoomHint}</p>}
+          {fam.graph.generations > 0 && (
+            <button type="button" onClick={() => onAdd({ kind: "child" })} className="mx-auto mt-5 flex min-h-11 items-center gap-2 rounded-full border border-dashed border-dusty/60 px-5 text-[0.92rem] text-rose">
+              <Plus className="h-4 w-4" aria-hidden />
+              {t.family.addChild}
+            </button>
+          )}
         </div>
         <div className="mt-12 flex flex-col items-center gap-3 text-center">
           <button type="button" onClick={() => onAdd({})} className={buttonClass.primary}>
