@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# סבתא רוזה · Бабушка Роза
 
-## Getting Started
+A private memorial website for the family, in Hebrew (RTL) and Russian (LTR).
 
-First, run the development server:
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+ADMIN_TOKEN="a-long-private-password" npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Site: http://localhost:3000
+- Share a memory: `/share`
+- Moderation: `/admin` (sign in with `ADMIN_TOKEN`, at least 12 characters)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Where things live
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| What | Where |
+|---|---|
+| All family content (bio chapters, timeline, photos, letters, media) | `src/content/index.ts` |
+| Content types and the `placeholder` flag | `src/content/types.ts` |
+| Interface text in Hebrew and Russian | `src/i18n/ui.ts` |
+| Design tokens (colours, fonts, spacing, shadows) | `src/app/globals.css` |
+| Motion presets | `src/lib/motion.ts` |
+| Sections | `src/components/sections/*` |
+| Upload rules (types, sizes) | `src/lib/limits.ts` |
+| Memory API, moderation, file access | `src/app/api/*`, `src/server/*` |
 
-## Learn More
+## Adding real content
 
-To learn more about Next.js, take a look at the following resources:
+1. Put optimized photos in `public/photos/` (WebP, about 2000px on the long side) and originals in `public/photos/full/`.
+2. In `src/content/index.ts`, set `src` / `full` on the matching photo, give its true `ratio` (width / height), and remove `placeholder: true`.
+3. Replace placeholder text in `story`, `milestones`, `notes` and `media` with the family's words, and remove `placeholder: true`.
+4. Years appear on the timeline only when `year` is filled in. Nothing is shown that the family has not provided.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Memories and moderation
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Visitors submit through `/share`. Text is cleaned, files are checked by their actual bytes (not their name), size-limited, and stored under generated names.
+- Every submission is stored as **pending**. Nothing is published until a moderator approves it in `/admin`.
+- Files of unapproved memories are never served publicly.
+- Development storage is the local `data/` folder (git-ignored). For production, implement the same `MemoryStore` interface in `src/server/store.ts` on Cloudflare D1 (records) and R2 (files).
 
-## Deploy on Vercel
+## Preview build
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+`STATIC_EXPORT=1 NEXT_PUBLIC_STATIC=1 npm run build` produces a static preview without the server routes. In that build the share form shows its confirmation but does not store anything.

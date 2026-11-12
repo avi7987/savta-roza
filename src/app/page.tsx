@@ -1,28 +1,34 @@
 import Header from "@/components/Header";
-import Hero from "@/components/Hero";
-import Memories, { WordsBand } from "@/components/Memories";
-import Timeline from "@/components/Timeline";
-import Album from "@/components/Album";
-import VideoInsight from "@/components/VideoInsight";
-import HelpSwipe from "@/components/HelpSwipe";
-import { Footer } from "@/components/Shell";
-import StaticUpload from "@/components/StaticUpload";
+import { LightboxProvider } from "@/components/Lightbox";
+import ShareOverlay from "@/components/ShareOverlay";
+import Contribute from "@/components/sections/Contribute";
+import Footer from "@/components/sections/Footer";
+import Hero from "@/components/sections/Hero";
+import Letters from "@/components/sections/Letters";
+import LifeTimeline from "@/components/sections/LifeTimeline";
+import MediaArchive from "@/components/sections/MediaArchive";
+import Memories from "@/components/sections/Memories";
+import PhotoGallery from "@/components/sections/PhotoGallery";
+import Story from "@/components/sections/Story";
+import { Divider } from "@/components/Botanical";
 
 export default function Home() {
   return (
-    <>
+    <LightboxProvider>
       <Header />
-      <main>
+      <main id="content">
         <Hero />
+        <Story />
+        <LifeTimeline />
+        <PhotoGallery />
+        <Divider />
         <Memories />
-        <WordsBand />
-        <Timeline />
-        <Album />
-        <VideoInsight />
-        <HelpSwipe />
+        <Letters />
+        <MediaArchive />
+        <Contribute />
       </main>
       <Footer />
-      <StaticUpload />
-    </>
+      <ShareOverlay />
+    </LightboxProvider>
   );
 }

@@ -1,228 +1,196 @@
 "use client";
 
-import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "motion/react";
-import { useEffect, useState } from "react";
-import { Menu, Plus, X } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState } from "react";
+import { Menu, X } from "lucide-react";
 import { useLang } from "@/lib/i18n";
-import { cn, RoseMark } from "./ui";
-import { Magnetic } from "./fx";
-import { TLink, useSite } from "./Transition";
-import type { Lang } from "@/lib/dict";
+import type { Lang } from "@/content/types";
+import { profile } from "@/content";
+import { RoseBud } from "./Botanical";
+import { TLink, getLenis } from "./Transition";
+import { cn } from "./ui";
+import { ease } from "@/lib/motion";
 
-export function LangToggle({ compact = false }: { compact?: boolean }) {
-  const { lang, setLang } = useLang();
-  const opts: { id: Lang; label: string }[] = [
-    { id: "he", label: compact ? "עב" : "עברית" },
-    { id: "ru", label: compact ? "RU" : "Русский" },
+export function LanguageSwitcher({ className, large }: { className?: string; large?: boolean }) {
+  const { lang, setLang, t } = useLang();
+  const opts: { id: Lang; label: string; full: string }[] = [
+    { id: "he", label: "עב", full: "עברית" },
+    { id: "ru", label: "RU", full: "Русский" },
   ];
   return (
-    <div role="group" aria-label="Language / שפה" className="relative flex rounded-full bg-white/70 p-1 ring-1 ring-ink/10 backdrop-blur">
-      {opts.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          onClick={() => setLang(o.id)}
-          aria-pressed={lang === o.id}
-          className={cn("relative min-h-10 rounded-full px-4 text-sm transition-colors", lang === o.id ? "text-white" : "text-ink-soft hover:text-ink")}
-        >
-          {lang === o.id && (
-            <motion.span layoutId={compact ? "lang-pill-c" : "lang-pill"} className="absolute inset-0 rounded-full bg-rosa" transition={{ type: "spring", stiffness: 400, damping: 30 }} />
-          )}
-          <span className="relative">{o.label}</span>
-        </button>
+    <div role="group" aria-label={t.nav.language} className={cn("flex items-center gap-1", className)}>
+      {opts.map((o, i) => (
+        <span key={o.id} className="flex items-center gap-1">
+          {i > 0 && <span aria-hidden className="h-3.5 w-px bg-charcoal/20" />}
+          <button
+            type="button"
+            lang={o.id}
+            onClick={() => setLang(o.id)}
+            aria-pressed={lang === o.id}
+            aria-label={o.full}
+            className={cn(
+              "relative flex min-h-11 min-w-11 items-center justify-center px-2 transition-colors",
+              large ? "text-lg" : "text-[0.9rem]",
+              lang === o.id ? "text-burgundy" : "text-ink-soft hover:text-charcoal"
+            )}
+          >
+            {large ? o.full : o.label}
+            {lang === o.id && <motion.span layoutId={large ? "lang-u-l" : "lang-u"} className="absolute inset-x-2 bottom-2 h-px bg-burgundy" transition={{ duration: 0.4, ease }} />}
+          </button>
+        </span>
       ))}
     </div>
   );
 }
 
-const SECTIONS = ["timeline", "album", "videos", "help"] as const;
+const LINKS = [
+  { id: "top", key: "home" },
+  { id: "story", key: "story" },
+  { id: "gallery", key: "gallery" },
+  { id: "memories", key: "memories" },
+] as const;
 
 export default function Header() {
-  const { t } = useLang();
-  const { ready } = useSite();
-  const { scrollY } = useScroll();
+  const { t, l } = useLang();
   const [scrolled, setScrolled] = useState(false);
-  const [hidden, setHidden] = useState(false);
-  const [active, setActive] = useState<string | null>(null);
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [active, setActive] = useState<string>("top");
   const [open, setOpen] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const menuBtn = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const lenis = (window as unknown as { __lenis?: { stop: () => void; start: () => void } }).__lenis;
-    if (open) lenis?.stop();
-    else lenis?.start();
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && setActive(e.target.id)),
+      { rootMargin: "-45% 0px -50% 0px" }
+    );
+    ["top", "story", "timeline", "gallery", "memories", "letters", "media", "contribute"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) io.observe(el);
+    });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      io.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    const lenis = getLenis();
+    if (open) {
+      lenis?.stop();
+      setTimeout(() => closeRef.current?.focus(), 50);
+    } else lenis?.start();
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && open) {
+        setOpen(false);
+        menuBtn.current?.focus();
+      }
+    };
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, [open]);
 
-  const jump = (id: string) => {
-    setOpen(false);
-    setTimeout(() => {
-      const el = document.getElementById(id);
-      const lenis = (window as unknown as { __lenis?: { start: () => void; scrollTo: (t: HTMLElement, o?: object) => void } }).__lenis;
-      if (!el) return;
-      if (lenis) {
-        lenis.start();
-        lenis.scrollTo(el, { duration: 1.4 });
-      } else el.scrollIntoView({ behavior: "smooth" });
-    }, 350);
-  };
-
-  useMotionValueEvent(scrollY, "change", (v) => {
-    const prev = scrollY.getPrevious() ?? 0;
-    setScrolled(v > 40);
-    setHidden(v > 600 && v > prev + 4);
-    if (v < prev - 4) setHidden(false);
-  });
-
-  useEffect(() => {
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting) setActive(e.target.id);
-        });
-      },
-      { rootMargin: "-50% 0px -50% 0px" }
-    );
-    const els = [...SECTIONS, "memories"].map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
-    els.forEach((el) => io.observe(el));
-    const top = () => window.scrollY < 300 && setActive(null);
-    window.addEventListener("scroll", top, { passive: true });
-    return () => {
-      io.disconnect();
-      window.removeEventListener("scroll", top);
-    };
-  }, []);
-
-  const labels: Record<(typeof SECTIONS)[number], string> = { timeline: t.nav.life, album: t.nav.album, videos: t.nav.videos, help: t.nav.help };
-  const pill = hovered ?? active;
+  const navActive = (id: string) => active === id || (id === "story" && active === "timeline") || (id === "gallery" && active === "media") || (id === "memories" && (active === "letters" || active === "contribute"));
 
   return (
     <>
-    <motion.header
-      initial={{ y: -80, opacity: 0 }}
-      animate={ready ? { y: hidden ? -100 : 0, opacity: 1 } : { y: -80, opacity: 0 }}
-      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed inset-x-0 top-3 z-50 flex justify-center px-3"
-    >
-      <div
+      <a href="#content" className="sr-only z-[90] rounded bg-white px-4 py-2 text-burgundy focus:not-sr-only focus:fixed focus:start-4 focus:top-4">
+        {t.skip}
+      </a>
+      <header
         className={cn(
-          "flex w-full max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 rounded-full px-3 py-2 transition-all duration-500 sm:px-5",
-          scrolled ? "bg-white/70 shadow-[0_8px_40px_-12px_rgba(163,22,74,0.25)] ring-1 ring-ink/5 backdrop-blur-xl" : "bg-transparent"
+          "fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-500",
+          scrolled ? "bg-ivory/90 shadow-[0_1px_0_var(--color-line)] backdrop-blur-md" : "bg-transparent"
         )}
+        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
-        <TLink href="/" className="group flex items-center gap-2 text-ink">
-          <motion.span whileHover={{ rotate: 25, scale: 1.1 }} className="flex h-10 w-10 items-center justify-center rounded-full bg-blush text-rosa">
-            <RoseMark className="h-6 w-6" />
-          </motion.span>
-          <AnimatePresence mode="wait">
-            <motion.span
-              key={t.brand}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              className="text-lg font-bold tracking-tight"
-            >
-              {t.brand}
-            </motion.span>
-          </AnimatePresence>
-        </TLink>
-        <nav aria-label="main" className="hidden flex-1 items-center justify-center gap-1 lg:flex" onMouseLeave={() => setHovered(null)}>
-          {SECTIONS.map((id) => (
-            <a
-              key={id}
-              href={`#${id}`}
-              onMouseEnter={() => setHovered(id)}
-              aria-current={active === id ? "true" : undefined}
-              className={cn("relative rounded-full px-4 py-2 text-[15px] transition-colors", pill === id ? "text-rosa-deep" : "text-ink-soft")}
-            >
-              {pill === id && <motion.span layoutId="nav-pill" className="absolute inset-0 rounded-full bg-blush" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
-              <span className="relative">{labels[id]}</span>
-            </a>
-          ))}
-        </nav>
-        <div className="ms-auto flex items-center gap-2">
-          <LangToggle compact />
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            aria-label={t.nav.menu}
-            aria-expanded={open}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/80 text-ink ring-1 ring-ink/10 backdrop-blur lg:hidden"
-          >
-            <Menu className="h-5 w-5" aria-hidden />
-          </button>
-          <Magnetic className="hidden sm:inline-flex">
-            <TLink
-              href="/upload"
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-ink px-5 text-sm font-medium text-white transition-colors hover:bg-rosa-deep"
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-              {t.add}
-            </TLink>
-          </Magnetic>
-        </div>
-      </div>
-    </motion.header>
+        <div className="mx-auto flex h-[4.5rem] max-w-[96rem] items-center gap-6 px-[var(--spacing-gutter)]">
+          <TLink href="/#top" className="flex items-center gap-2.5 text-burgundy">
+            <RoseBud className="h-8 w-6" still />
+            <span className="font-display text-[1.35rem] leading-none">{l(profile.name)}</span>
+          </TLink>
 
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          key="menu"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t.nav.menu}
-          data-lenis-prevent
-          initial={{ clipPath: "circle(0% at 90% 4%)" }}
-          animate={{ clipPath: "circle(150% at 90% 4%)" }}
-          exit={{ clipPath: "circle(0% at 90% 4%)" }}
-          transition={{ duration: 0.6, ease: [0.76, 0, 0.24, 1] }}
-          className="fixed inset-0 z-[80] flex flex-col overflow-y-auto bg-gradient-to-br from-blush via-cream to-[#fbe7d6] px-6 pb-10 pt-6 lg:hidden"
-        >
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-lg font-bold text-ink">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-rosa">
-                <RoseMark className="h-6 w-6" />
-              </span>
-              {t.brand}
-            </span>
-            <button type="button" onClick={() => setOpen(false)} aria-label={t.nav.close} className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-ink ring-1 ring-ink/10">
-              <X className="h-5 w-5" aria-hidden />
-            </button>
-          </div>
-          <nav aria-label="main" className="mt-12 flex flex-col gap-2">
-            {(["memories", ...SECTIONS] as const).map((id, i) => (
-              <motion.button
-                key={id}
-                type="button"
-                onClick={() => jump(id)}
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.25 + i * 0.07, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="group flex items-baseline gap-4 border-b border-ink/10 py-4 text-start"
+          <nav aria-label={t.nav.menu} className="ms-auto hidden items-center gap-1 md:flex">
+            {LINKS.map((link) => (
+              <TLink
+                key={link.id}
+                href={`/#${link.id}`}
+                aria-current={navActive(link.id) ? "true" : undefined}
+                className={cn("relative px-3.5 py-3 text-[0.95rem] transition-colors", navActive(link.id) ? "text-burgundy" : "text-charcoal/75 hover:text-charcoal")}
               >
-                <span className="text-sm tabular-nums text-rosa">0{i + 1}</span>
-                <span className="text-4xl font-black tracking-tight text-ink transition-colors group-hover:text-rosa-deep sm:text-5xl">
-                  {id === "memories" ? t.nav.memories : labels[id]}
-                </span>
-              </motion.button>
+                {t.nav[link.key]}
+                {navActive(link.id) && <motion.span layoutId="nav-u" className="absolute inset-x-3.5 bottom-2 h-px bg-burgundy" transition={{ duration: 0.5, ease }} />}
+              </TLink>
             ))}
           </nav>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="mt-auto flex flex-wrap items-center gap-3 pt-10">
+
+          <div className="ms-auto flex items-center gap-2 md:ms-4">
+            <LanguageSwitcher className="hidden sm:flex" />
             <TLink
-              href="/upload"
-              onClick={() => setOpen(false)}
-              className="inline-flex min-h-12 items-center gap-2 rounded-full bg-gradient-to-br from-rosa to-rosa-deep px-6 font-medium text-white"
+              href="/share"
+              className="hidden min-h-11 items-center rounded-full border border-rose/40 px-5 text-[0.92rem] text-burgundy transition-colors hover:border-rose hover:bg-rose hover:text-white sm:inline-flex"
             >
-              <Plus className="h-5 w-5" aria-hidden />
-              {t.add}
+              {t.nav.share}
             </TLink>
-            <LangToggle />
+            <button
+              ref={menuBtn}
+              type="button"
+              onClick={() => setOpen(true)}
+              aria-label={t.nav.menu}
+              aria-expanded={open}
+              aria-controls="mobile-menu"
+              className="flex h-11 w-11 items-center justify-center text-burgundy md:hidden"
+            >
+              <Menu className="h-6 w-6" strokeWidth={1.4} aria-hidden />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            id="mobile-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.nav.menu}
+            data-lenis-prevent
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35 }}
+            className="fixed inset-0 z-[80] flex flex-col overflow-y-auto bg-ivory px-[var(--spacing-gutter)] pb-10"
+            style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+          >
+            <div className="flex h-[4.5rem] items-center justify-between">
+              <span className="flex items-center gap-2.5 text-burgundy">
+                <RoseBud className="h-8 w-6" still />
+                <span className="font-display text-[1.35rem]">{l(profile.name)}</span>
+              </span>
+              <button ref={closeRef} type="button" onClick={() => setOpen(false)} aria-label={t.nav.close} className="flex h-11 w-11 items-center justify-center text-burgundy">
+                <X className="h-6 w-6" strokeWidth={1.4} aria-hidden />
+              </button>
+            </div>
+            <nav aria-label={t.nav.menu} className="mt-10 flex flex-col">
+              {[...LINKS, { id: "timeline", key: "timeline" as const }].map((link, i) => (
+                <motion.div key={link.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.05, duration: 0.5, ease }}>
+                  <TLink href={`/#${link.id}`} onClick={() => setOpen(false)} className="flex items-baseline gap-4 border-b border-line py-4">
+                    <span className="font-display text-[2.1rem] font-light leading-tight text-charcoal">{t.nav[link.key]}</span>
+                  </TLink>
+                </motion.div>
+              ))}
+            </nav>
+            <div className="mt-auto flex flex-col gap-6 pt-10">
+              <LanguageSwitcher large />
+              <TLink href="/share" onClick={() => setOpen(false)} className="inline-flex min-h-12 w-fit items-center rounded-full bg-rose px-7 text-white">
+                {t.nav.share}
+              </TLink>
+            </div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
     </>
   );
 }

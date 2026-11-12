@@ -4,13 +4,11 @@ import { AnimatePresence, motion } from "motion/react";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState, type AnchorHTMLAttributes, type MouseEvent, type ReactNode } from "react";
 
-type SiteCtx = { go: (href: string) => void; ready: boolean; setReady: (b: boolean) => void };
-
-/** In the single-file preview build there is no server routing, so the upload screen lives at #upload. */
+/** In the single-file preview build there is no server routing, so the share screen lives at #share. */
 export const STATIC = process.env.NEXT_PUBLIC_STATIC === "1";
 
 export function useHashView() {
-  const [view, setView] = useState<string>("");
+  const [view, setView] = useState("");
   useEffect(() => {
     const read = () => setView(window.location.hash.replace("#", ""));
     read();
@@ -20,62 +18,65 @@ export function useHashView() {
   return view;
 }
 
-const Ctx = createContext<SiteCtx>({ go: () => {}, ready: true, setReady: () => {} });
+type Ctx = { go: (href: string) => void };
+const SiteCtx = createContext<Ctx>({ go: () => {} });
+export const useSite = () => useContext(SiteCtx);
 
-export const useSite = () => useContext(Ctx);
+type LenisLike = { scrollTo: (t: number | HTMLElement, o?: object) => void; stop: () => void; start: () => void };
+export const getLenis = () => (typeof window === "undefined" ? undefined : (window as unknown as { __lenis?: LenisLike }).__lenis);
 
-/** Holds the intro "ready" flag and runs the rose-curtain page transition between routes. */
+/** A short ivory fade between pages: calm, like turning to the next page of an album. */
 export function TransitionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [covering, setCovering] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [veil, setVeil] = useState(false);
   const target = useRef<string | null>(null);
   const prev = useRef(pathname);
 
   useEffect(() => {
     if (prev.current === pathname) return;
     prev.current = pathname;
-    const lenis = (window as unknown as { __lenis?: { scrollTo: (n: number, o: object) => void } }).__lenis;
-    lenis?.scrollTo(0, { immediate: true, force: true });
+    getLenis()?.scrollTo(0, { immediate: true, force: true });
     window.scrollTo(0, 0);
-    const id = setTimeout(() => setCovering(false), 150);
+    const id = setTimeout(() => setVeil(false), 80);
     return () => clearTimeout(id);
   }, [pathname]);
-
-  const go = (href: string) => {
-    if (!STATIC && href === pathname) return;
-    target.current = href;
-    if (!STATIC) router.prefetch(href);
-    setCovering(true);
-  };
 
   const arrive = (href: string) => {
     if (!STATIC) {
       router.push(href);
       return;
     }
-    if (href === "/upload") window.location.hash = "upload";
-    else history.replaceState(null, "", window.location.pathname + window.location.search);
-    window.dispatchEvent(new HashChangeEvent("hashchange"));
-    const lenis = (window as unknown as { __lenis?: { scrollTo: (n: number, o: object) => void } }).__lenis;
-    if (href === "/") lenis?.scrollTo(0, { immediate: true, force: true });
-    setTimeout(() => setCovering(false), 200);
+    const [path, hash] = href.split("#");
+    if (path === "/share") window.location.hash = "share";
+    else {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+      if (hash) setTimeout(() => document.getElementById(hash) && getLenis()?.scrollTo(document.getElementById(hash)!, { immediate: true }), 50);
+    }
+    setTimeout(() => setVeil(false), 120);
+  };
+
+  const go = (href: string) => {
+    if (!STATIC && href === pathname) return;
+    target.current = href;
+    if (!STATIC) router.prefetch(href);
+    setVeil(true);
   };
 
   return (
-    <Ctx.Provider value={{ go, ready, setReady }}>
+    <SiteCtx.Provider value={{ go }}>
       {children}
       <AnimatePresence>
-        {covering && (
+        {veil && (
           <motion.div
-            key="curtain"
+            key="veil"
             aria-hidden
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-gradient-to-br from-rosa via-rosa-deep to-[#6e0f33]"
-            initial={{ clipPath: "circle(0% at 50% 100%)" }}
-            animate={{ clipPath: "circle(150% at 50% 100%)" }}
-            exit={{ clipPath: "circle(0% at 50% 0%)" }}
-            transition={{ duration: 0.75, ease: [0.76, 0, 0.24, 1] }}
+            className="fixed inset-0 z-[100] bg-ivory"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.35, ease: "easeInOut" }}
             onAnimationComplete={() => {
               if (target.current) {
                 const href = target.current;
@@ -83,39 +84,35 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
                 arrive(href);
               }
             }}
-          >
-            <motion.svg
-              viewBox="0 0 24 24"
-              className="h-20 w-20 text-white"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1"
-              strokeLinecap="round"
-              initial={{ scale: 0.6, opacity: 0, rotate: -30 }}
-              animate={{ scale: 1, opacity: 1, rotate: 0 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-            >
-              <path d="M12 6.5c-2.2 0-3.6 1.5-3.6 3.3 0 1.6 1.2 2.7 2.7 2.7 1.3 0 2.2-.9 2.2-2 0-.9-.7-1.5-1.5-1.5" />
-              <path d="M8.6 8.4C7.2 9 6.4 10.3 6.4 11.8c0 2.5 2.4 4.4 5.6 4.4s5.6-1.9 5.6-4.4c0-1.6-.9-2.9-2.3-3.5" />
-              <path d="M9.2 7.2c.6-1.4 1.6-2.2 2.8-2.2s2.3.8 2.9 2.1" />
-              <path d="M12 16.2V22" />
-            </motion.svg>
-          </motion.div>
+          />
         )}
       </AnimatePresence>
-    </Ctx.Provider>
+    </SiteCtx.Provider>
   );
 }
 
-/** Link that plays the curtain transition before navigating. */
+/** Link between pages that uses the soft fade. In-page anchors scroll smoothly instead. */
 export function TLink({ href, onClick, children, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) {
   const { go } = useSite();
+  const pathname = usePathname();
   return (
     <a
-      href={href}
+      href={STATIC && href === "/share" ? "#share" : href}
       onClick={(e: MouseEvent<HTMLAnchorElement>) => {
         onClick?.(e);
-        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0 || href.startsWith("#")) return;
+        if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        const [path, hash] = href.split("#");
+        const samePage = href.startsWith("#") || ((path === "" || path === pathname) && !STATIC) || (STATIC && path === "/" && window.location.hash !== "#share");
+        if (samePage && hash) {
+          const el = document.getElementById(hash);
+          if (el) {
+            e.preventDefault();
+            const lenis = getLenis();
+            if (lenis) lenis.scrollTo(el, { offset: -24, duration: 1.4 });
+            else el.scrollIntoView({ behavior: "smooth" });
+            return;
+          }
+        }
         e.preventDefault();
         go(href);
       }}

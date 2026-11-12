@@ -1,18 +1,27 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { dict, type Lang } from "./dict";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { ui, type UI } from "@/i18n/ui";
+import type { Lang, Localized } from "@/content/types";
 
-type Ctx = { lang: Lang; setLang: (l: Lang) => void; t: (typeof dict)[Lang]; dir: "rtl" | "ltr" };
+type Ctx = {
+  lang: Lang;
+  setLang: (l: Lang) => void;
+  t: UI;
+  dir: "rtl" | "ltr";
+  /** pick the visitor's language from a localized content field */
+  l: (v?: Localized) => string;
+};
 
 const LangContext = createContext<Ctx | null>(null);
+const KEY = "roza-lang";
 
 export function LangProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>("he");
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("roza-lang");
+      const saved = localStorage.getItem(KEY);
       if (saved === "he" || saved === "ru") setLangState(saved);
     } catch {}
   }, []);
@@ -24,18 +33,20 @@ export function LangProvider({ children }: { children: ReactNode }) {
     document.documentElement.dir = dir;
   }, [lang, dir]);
 
-  const setLang = (l: Lang) => {
-    setLangState(l);
+  const setLang = useCallback((next: Lang) => {
+    setLangState(next);
     try {
-      localStorage.setItem("roza-lang", l);
+      localStorage.setItem(KEY, next);
     } catch {}
-  };
+  }, []);
 
-  return <LangContext.Provider value={{ lang, setLang, t: dict[lang], dir }}>{children}</LangContext.Provider>;
+  const l = useCallback((v?: Localized) => (v ? v[lang] : ""), [lang]);
+
+  return <LangContext.Provider value={{ lang, setLang, t: ui[lang], dir, l }}>{children}</LangContext.Provider>;
 }
 
 export function useLang() {
   const ctx = useContext(LangContext);
-  if (!ctx) throw new Error("useLang outside LangProvider");
+  if (!ctx) throw new Error("useLang must be used inside LangProvider");
   return ctx;
 }
