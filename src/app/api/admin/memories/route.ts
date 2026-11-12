@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 
 /** Everything waiting for review (or another status), for moderators only. */
 export async function GET(req: Request) {
-  if (!isAdmin(req)) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await isAdmin(req))) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   const status = (new URL(req.url).searchParams.get("status") ?? "pending") as Status;
   const kind = new URL(req.url).searchParams.get("kind");
   const items = kind === "family" ? await familyStore.list(status) : await store.list(status);

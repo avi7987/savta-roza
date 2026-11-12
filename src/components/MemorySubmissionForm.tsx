@@ -43,7 +43,7 @@ export default function MemorySubmissionForm() {
   const [values, setValues] = useState({ name: "", relation: "", title: "", memory: "" });
   const [files, setFiles] = useState<Picked[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [state, setState] = useState<"idle" | "sending" | "done" | "error" | "full">("idle");
   const [over, setOver] = useState(false);
   const [tagged, setTagged] = useState<string[]>([]);
   const fam = useFamily();
@@ -94,6 +94,10 @@ export default function MemorySubmissionForm() {
     files.forEach((f) => fd.append("files", f.file));
     try {
       const res = await fetch("/api/memories", { method: "POST", body: fd });
+      if (res.status === 507) {
+        setState("full");
+        return;
+      }
       if (!res.ok) throw new Error(String(res.status));
       setState("done");
     } catch {
@@ -258,6 +262,11 @@ export default function MemorySubmissionForm() {
             </fieldset>
           )}
 
+          {state === "full" && (
+            <p role="alert" className="rounded-[var(--radius-card)] bg-blush/50 px-4 py-3 text-burgundy">
+              {s.errors.full}
+            </p>
+          )}
           {state === "error" && (
             <p role="alert" className="rounded-[var(--radius-card)] bg-blush/50 px-4 py-3 text-burgundy">
               {s.errors.server}

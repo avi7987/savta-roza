@@ -1,9 +1,11 @@
 import "server-only";
 import { timingSafeEqual } from "node:crypto";
+import { setting } from "./notify";
 
 /** Moderators sign in with the ADMIN_TOKEN set in the server environment. It is never sent to the browser bundle. */
-export function isAdmin(req: Request) {
-  const expected = process.env.ADMIN_TOKEN;
+export async function isAdmin(req: Request) {
+  // on Cloudflare the password is a Worker secret; in development it comes from the environment
+  const expected = await setting("ADMIN_TOKEN");
   const given = req.headers.get("x-admin-token") ?? "";
   if (!expected || expected.length < 12) return false;
   const a = Buffer.from(given);

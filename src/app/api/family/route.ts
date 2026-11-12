@@ -6,6 +6,7 @@ import { LIMITS, maxBytes } from "@/lib/limits";
 import { rateLimited } from "@/server/auth";
 import { sniff } from "@/server/sniff";
 import { familyStore, type StoredPerson } from "@/server/store";
+import { afterStore, canStore } from "@/server/quota";
 
 export const runtime = "nodejs";
 
@@ -94,7 +95,9 @@ export async function POST(req: Request) {
   }
 
   if (errors.length) return NextResponse.json({ error: "invalid", fields: errors }, { status: 422 });
+  if (!(await canStore(files.reduce((s, f) => s + f.data.byteLength, 0)))) return NextResponse.json({ error: "full" }, { status: 507 });
 
   const saved = await familyStore.create(r, files);
+  if (files.length) await afterStore();
   return NextResponse.json({ ok: true, id: baseId(saved), status: saved.status }, { status: 201 });
 }

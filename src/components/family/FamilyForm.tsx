@@ -118,7 +118,7 @@ export default function FamilyForm({ fam, preset, onClose }: { fam: Fam; preset:
   const [name, setName] = useState("");
   const [gender, setGender] = useState<Gender>("x");
   const [more, setMore] = useState(false);
-  const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
+  const [state, setState] = useState<"idle" | "sending" | "done" | "error" | "full">("idle");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -224,6 +224,10 @@ export default function FamilyForm({ fam, preset, onClose }: { fam: Fam; preset:
     if (photo instanceof File && photo.size) body.set("photo", photo);
     try {
       const res = await fetch("/api/family", { method: "POST", body });
+      if (res.status === 507) {
+        setState("full");
+        return;
+      }
       if (!res.ok) throw new Error(String(res.status));
       const { id } = await res.json();
       fam.addLocal(id, req);
@@ -405,6 +409,7 @@ export default function FamilyForm({ fam, preset, onClose }: { fam: Fam; preset:
               </label>
 
               {state === "error" && <p role="alert" className="rounded-[var(--radius-card)] bg-blush/50 px-4 py-3 text-burgundy">{f.errors.server}</p>}
+              {state === "full" && <p role="alert" className="rounded-[var(--radius-card)] bg-blush/50 px-4 py-3 text-burgundy">{f.errors.full}</p>}
               {Object.keys(errors).length > 0 && (
                 <p className="rounded-[var(--radius-card)] bg-blush/50 px-4 py-3 text-[0.95rem] text-burgundy">
                   {f.errors.summary} {Object.values(errors).join(" · ")}

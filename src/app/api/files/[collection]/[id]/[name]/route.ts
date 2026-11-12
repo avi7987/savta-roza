@@ -26,7 +26,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
   if (!s) return new Response("Not found", { status: 404 });
   const record = await s.get(id);
   if (!record || !record.files.some((f) => f.name === name)) return new Response("Not found", { status: 404 });
-  if (record.status !== "approved" && !isAdmin(req)) return new Response("Not found", { status: 404 });
+  if (record.status !== "approved" && !(await isAdmin(req))) return new Response("Not found", { status: 404 });
   const data = await s.readFile(id, name);
   if (!data) return new Response("Not found", { status: 404 });
   const ext = name.split(".").pop() ?? "";
@@ -35,7 +35,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
       "Content-Type": TYPES[ext] ?? "application/octet-stream",
       "Content-Disposition": "inline",
       "X-Content-Type-Options": "nosniff",
-      "Cache-Control": record.status === "approved" ? "public, max-age=86400" : "no-store",
+      "Cache-Control": record.status === "approved" ? "public, max-age=31536000, immutable" : "no-store",
     },
   });
 }

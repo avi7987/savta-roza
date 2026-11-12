@@ -49,6 +49,13 @@ export interface Store<T extends Base> {
   get(id: string): Promise<T | undefined>;
   setStatus(id: string, status: Status): Promise<T | undefined>;
   readFile(id: string, name: string): Promise<Uint8Array | undefined>;
+  /** delete a record's files (e.g. after it was rejected); returns the bytes freed */
+  removeFiles(id: string): Promise<number>;
+  /** total bytes of files this collection keeps */
+  usedBytes(): Promise<number>;
+  /** small key/value notes (e.g. when an alert was last sent) */
+  getMeta(key: string): Promise<string | undefined>;
+  setMeta(key: string, value: string): Promise<void>;
 }
 
 
@@ -78,6 +85,10 @@ function lazy<T extends Base>(collection: string): Store<T> {
     get: async (id) => (await b()).get(id),
     setStatus: async (id, s) => (await b()).setStatus(id, s),
     readFile: async (id, name) => (await b()).readFile(id, name),
+    removeFiles: async (id) => (await b()).removeFiles(id),
+    usedBytes: async () => (await b()).usedBytes(),
+    getMeta: async (k) => (await b()).getMeta(k),
+    setMeta: async (k, v) => (await b()).setMeta(k, v),
   };
 }
 
@@ -88,7 +99,14 @@ export type D1Like = {
 export type R2Like = {
   put(key: string, value: Uint8Array, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
   get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
+  delete(keys: string | string[]): Promise<void>;
 };
 
 export const store: Store<StoredMemory> = lazy<StoredMemory>("memories");
 export const familyStore: Store<StoredPerson> = lazy<StoredPerson>("family");
+
+/** bytes used by every uploaded file, across memories and the family tree */
+export async function storageUsed() {
+  const [a, b] = await Promise.all([store.usedBytes(), familyStore.usedBytes()]);
+  return a + b;
+}

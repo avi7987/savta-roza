@@ -49,6 +49,12 @@ ADMIN_TOKEN="a-long-private-password" npm run dev
 - Files of unapproved memories are never served publicly.
 - Storage is chosen automatically: on Cloudflare, records go to D1 (`records` table, see `migrations/`) and files to R2 (`savta-roza-files`); in development they go to the local `data/` folder (git-ignored).
 
+## Storage limit and email alerts
+
+- New files are refused once uploads total **8 GB** (Cloudflare R2's free tier is 10 GB); text-only memories still go through. Change with the `STORAGE_CAP_GB` variable (`STORAGE_WARN_GB`, default 7, sets the early warning).
+- Files of rejected memories and family requests are deleted.
+- At 7 GB and at 8 GB the owner gets an email (at most one of each per day) through [Resend](https://resend.com). Set two Worker secrets: `RESEND_API_KEY` and `ALERT_EMAIL` (the address the Resend account was opened with).
+
 ## Deploying to Cloudflare
 
 ```bash

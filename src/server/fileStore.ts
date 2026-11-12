@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Base, Store, StoredFile } from "./store";
 
@@ -65,6 +65,36 @@ export function fileStore<T extends Base>(collection: string): Store<T> {
         m.reviewedAt = new Date().toISOString();
         await write(all);
         return m;
+      }),
+    removeFiles: (id) =>
+      locked(async () => {
+        const all = await read();
+        const m = all.find((x) => x.id === id);
+        if (!m || !m.files.length) return 0;
+        const freed = m.files.reduce((s, f) => s + f.size, 0);
+        await rm(path.join(uploads, id), { recursive: true, force: true });
+        m.files = [];
+        await write(all);
+        return freed;
+      }),
+    usedBytes: async () => (await read()).reduce((s, m) => s + m.files.reduce((t, f) => t + f.size, 0), 0),
+    getMeta: async (key) => {
+      try {
+        return (JSON.parse(await readFile(path.join(ROOT, "meta.json"), "utf8")) as Record<string, string>)[key];
+      } catch {
+        return undefined;
+      }
+    },
+    setMeta: (key, value) =>
+      locked(async () => {
+        const file = path.join(ROOT, "meta.json");
+        let meta: Record<string, string> = {};
+        try {
+          meta = JSON.parse(await readFile(file, "utf8"));
+        } catch {}
+        meta[key] = value;
+        await mkdir(ROOT, { recursive: true });
+        await writeFile(file, JSON.stringify(meta, null, 2));
       }),
     readFile: async (id, name) => {
       if (!/^[0-9a-f-]{36}$/.test(id) || !SAFE.test(name)) return undefined;
