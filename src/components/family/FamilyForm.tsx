@@ -70,7 +70,7 @@ function Picker({ ids, value, onChange, fam, allowNew, label, error }: { ids: st
         )}
         {!allowNew && ids.length === 0 && <span className="text-[0.9rem] text-ink-soft">{t.family.form.noOne}</span>}
       </div>
-      {error && <span role="alert" className="text-[0.88rem] text-burgundy">{error}</span>}
+      {error && <span role="alert" data-error className="text-[0.88rem] text-burgundy">{error}</span>}
     </fieldset>
   );
 }
@@ -170,7 +170,9 @@ export default function FamilyForm({ fam, preset, onClose }: { fam: Fam; preset:
 
   const submit = async (ev: FormEvent<HTMLFormElement>) => {
     ev.preventDefault();
-    const fd = new FormData(ev.currentTarget);
+    // keep the element: React clears currentTarget once the handler returns
+    const formEl = ev.currentTarget;
+    const fd = new FormData(formEl);
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = f.errors.name;
     if (!replaces) {
@@ -182,7 +184,12 @@ export default function FamilyForm({ fam, preset, onClose }: { fam: Fam; preset:
     if (fd.get("consent") !== "yes") e.consent = f.errors.consent;
     setErrors(e);
     if (Object.keys(e).length) {
-      requestAnimationFrame(() => ev.currentTarget?.querySelector<HTMLElement>("[role=alert]")?.scrollIntoView({ block: "center", behavior: "smooth" }));
+      // after the messages render, bring the first one into view and focus its field
+      setTimeout(() => {
+        const first = formEl.querySelector<HTMLElement>("[data-error]");
+        first?.scrollIntoView({ block: "center", behavior: "smooth" });
+        first?.closest("fieldset, div")?.querySelector<HTMLElement>("input, button")?.focus({ preventScroll: true });
+      }, 60);
       return;
     }
 
@@ -292,7 +299,7 @@ export default function FamilyForm({ fam, preset, onClose }: { fam: Fam; preset:
                       </button>
                     ))}
                   </div>
-                  {errors.kind && <span role="alert" className="text-[0.88rem] text-burgundy">{errors.kind}</span>}
+                  {errors.kind && <span role="alert" data-error className="text-[0.88rem] text-burgundy">{errors.kind}</span>}
                 </fieldset>
               )}
 
@@ -316,7 +323,7 @@ export default function FamilyForm({ fam, preset, onClose }: { fam: Fam; preset:
                 <div className="flex flex-col gap-2">
                   <label htmlFor={ids.name}>{f.name}</label>
                   <input id={ids.name} value={name} onChange={(e) => setName(e.target.value)} maxLength={LIMITS.name} aria-invalid={!!errors.name} className={input} />
-                  {errors.name && <span role="alert" className="text-[0.88rem] text-burgundy">{errors.name}</span>}
+                  {errors.name && <span role="alert" data-error className="text-[0.88rem] text-burgundy">{errors.name}</span>}
                 </div>
                 <div className="flex flex-col gap-2">
                   <label htmlFor={ids.alt}>
@@ -390,7 +397,7 @@ export default function FamilyForm({ fam, preset, onClose }: { fam: Fam; preset:
                 <span>
                   {f.consent}
                   {errors.consent && (
-                    <span role="alert" className="mt-1 block text-[0.88rem] text-burgundy">
+                    <span role="alert" data-error className="mt-1 block text-[0.88rem] text-burgundy">
                       {errors.consent}
                     </span>
                   )}
@@ -398,6 +405,11 @@ export default function FamilyForm({ fam, preset, onClose }: { fam: Fam; preset:
               </label>
 
               {state === "error" && <p role="alert" className="rounded-[var(--radius-card)] bg-blush/50 px-4 py-3 text-burgundy">{f.errors.server}</p>}
+              {Object.keys(errors).length > 0 && (
+                <p className="rounded-[var(--radius-card)] bg-blush/50 px-4 py-3 text-[0.95rem] text-burgundy">
+                  {f.errors.summary} {Object.values(errors).join(" · ")}
+                </p>
+              )}
 
               <button type="submit" disabled={state === "sending"} className={cn(buttonClass.primary, "w-full sm:w-fit disabled:opacity-60")}>
                 {state === "sending" ? f.sending : f.submit}
