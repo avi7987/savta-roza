@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "savta-roza",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  // memories and family-tree requests
+  "d1_databases": [{ "binding": "DB", "database_name": "savta-roza", "database_id": "5657cd13-5423-42a8-8e69-95919e067c2c", "migrations_dir": "migrations" }],
+  // uploaded photos, videos and recordings
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "savta-roza-files" }],
+  "observability": { "enabled": true }
+}

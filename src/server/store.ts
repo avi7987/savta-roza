@@ -1,19 +1,16 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import path from "node:path";
 
 /**
- * Where submissions live. This file-based store is for development and self-hosting.
- * The production deployment swaps in a Cloudflare adapter (D1 for records, R2 for files)
- * behind the same interface, so the API routes do not change.
+ * Where submissions live. In production (Cloudflare) records go to D1 and files to R2;
+ * in development they go to the local data/ folder. Both sit behind the same interface,
+ * so the API routes do not change.
  */
 
 export type Status = "pending" | "approved" | "rejected";
 
 export type StoredFile = { name: string; kind: "image" | "video" | "audio"; size: number };
 
-type Base = { id: string; status: Status; files: StoredFile[]; createdAt: string; reviewedAt?: string };
+export type Base = { id: string; status: Status; files: StoredFile[]; createdAt: string; reviewedAt?: string };
 
 export type StoredMemory = Base & {
   author: string;
@@ -54,76 +51,44 @@ export interface Store<T extends Base> {
   readFile(id: string, name: string): Promise<Uint8Array | undefined>;
 }
 
-const ROOT = path.resolve(process.env.DATA_DIR ?? path.join(process.cwd(), "data"));
-const SAFE = /^[a-z0-9-]+\.[a-z0-9]{2,4}$/;
 
-let queue: Promise<unknown> = Promise.resolve();
-/** serialize writes so two submissions never overwrite each other */
-const locked = <R>(fn: () => Promise<R>): Promise<R> => {
-  const run = queue.then(fn, fn);
-  queue = run.catch(() => {});
-  return run;
-};
-
-function fileStore<T extends Base>(collection: string): Store<T> {
-  const index = path.join(ROOT, `${collection}.json`);
-  const uploads = path.join(ROOT, "uploads", collection);
-
-  const read = async (): Promise<T[]> => {
-    try {
-      return JSON.parse(await readFile(index, "utf8"));
-    } catch {
-      return [];
+async function backend<T extends Base>(collection: string): Promise<Store<T>> {
+  try {
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+    const { env } = await getCloudflareContext({ async: true });
+    const e = env as unknown as { DB?: D1Like; FILES?: R2Like };
+    if (e.DB && e.FILES) {
+      const { cloudStore } = await import("./cloudStore");
+      return cloudStore<T>(collection, e.DB, e.FILES);
     }
-  };
-  const write = async (all: T[]) => {
-    await mkdir(ROOT, { recursive: true });
-    const tmp = `${index}.${process.pid}.tmp`;
-    await writeFile(tmp, JSON.stringify(all, null, 2));
-    await rename(tmp, index);
-  };
+  } catch {
+    /* not running on Cloudflare */
+  }
+  const { fileStore } = await import("./fileStore");
+  return fileStore<T>(collection);
+}
 
+/** A store whose backend is chosen on first use. */
+function lazy<T extends Base>(collection: string): Store<T> {
+  let p: Promise<Store<T>> | null = null;
+  const b = () => (p ??= backend<T>(collection));
   return {
-    create: (fields, files) =>
-      locked(async () => {
-        const id = randomUUID();
-        const dir = path.join(uploads, id);
-        const stored: StoredFile[] = [];
-        if (files.length) await mkdir(dir, { recursive: true });
-        for (const f of files) {
-          // file names are generated here; nothing the visitor typed reaches the file system
-          const name = `${randomUUID()}.${f.ext}`;
-          await writeFile(path.join(dir, name), f.data);
-          stored.push({ name, kind: f.kind, size: f.data.byteLength });
-        }
-        const record = { ...fields, id, status: "pending", createdAt: new Date().toISOString(), files: stored } as T;
-        const all = await read();
-        all.push(record);
-        await write(all);
-        return record;
-      }),
-    list: async (status) => (await read()).filter((m) => !status || m.status === status).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    get: async (id) => (await read()).find((m) => m.id === id),
-    setStatus: (id, status) =>
-      locked(async () => {
-        const all = await read();
-        const m = all.find((x) => x.id === id);
-        if (!m) return undefined;
-        m.status = status;
-        m.reviewedAt = new Date().toISOString();
-        await write(all);
-        return m;
-      }),
-    readFile: async (id, name) => {
-      if (!/^[0-9a-f-]{36}$/.test(id) || !SAFE.test(name)) return undefined;
-      try {
-        return new Uint8Array(await readFile(path.join(uploads, id, name)));
-      } catch {
-        return undefined;
-      }
-    },
+    create: async (f, files) => (await b()).create(f, files),
+    list: async (s) => (await b()).list(s),
+    get: async (id) => (await b()).get(id),
+    setStatus: async (id, s) => (await b()).setStatus(id, s),
+    readFile: async (id, name) => (await b()).readFile(id, name),
   };
 }
 
-export const store: Store<StoredMemory> = fileStore<StoredMemory>("memories");
-export const familyStore: Store<StoredPerson> = fileStore<StoredPerson>("family");
+/* minimal shapes of the Cloudflare bindings we use */
+export type D1Like = {
+  prepare(sql: string): { bind(...v: unknown[]): { run(): Promise<unknown>; first<R>(): Promise<R | null>; all<R>(): Promise<{ results: R[] }> } };
+};
+export type R2Like = {
+  put(key: string, value: Uint8Array, opts?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
+  get(key: string): Promise<{ arrayBuffer(): Promise<ArrayBuffer> } | null>;
+};
+
+export const store: Store<StoredMemory> = lazy<StoredMemory>("memories");
+export const familyStore: Store<StoredPerson> = lazy<StoredPerson>("family");

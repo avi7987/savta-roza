@@ -47,7 +47,27 @@ ADMIN_TOKEN="a-long-private-password" npm run dev
 - Visitors submit through `/share`. Text is cleaned, files are checked by their actual bytes (not their name), size-limited, and stored under generated names.
 - Every submission is stored as **pending**. Nothing is published until a moderator approves it in `/admin`.
 - Files of unapproved memories are never served publicly.
-- Development storage is the local `data/` folder (git-ignored). For production, implement the same `MemoryStore` interface in `src/server/store.ts` on Cloudflare D1 (records) and R2 (files).
+- Storage is chosen automatically: on Cloudflare, records go to D1 (`records` table, see `migrations/`) and files to R2 (`savta-roza-files`); in development they go to the local `data/` folder (git-ignored).
+
+## Deploying to Cloudflare
+
+```bash
+npx opennextjs-cloudflare build
+```
+
+```bash
+npx wrangler d1 migrations apply savta-roza --remote
+```
+
+```bash
+npx wrangler secret put ADMIN_TOKEN
+```
+
+```bash
+npx opennextjs-cloudflare deploy
+```
+
+Bindings live in `wrangler.jsonc`: `DB` (D1 database `savta-roza`) and `FILES` (R2 bucket `savta-roza-files`). For local testing in the Cloudflare runtime, put `ADMIN_TOKEN=...` in `.dev.vars` and run `npx wrangler dev`.
 
 ## Preview build
 
