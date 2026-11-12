@@ -4,7 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import type { StoredMemory, StoredPerson, Status } from "@/server/store";
 
 type Kind = "memories" | "family";
-const REL: Record<string, string> = { child: "הילד/ה של", partner: "בן/בת הזוג של", sibling: "אח/ות של", parent: "הורה של" };
+const KIND: Record<string, string> = { child: "בן/בת של רוזה", grandchild: "נכד/ה", great: "נין/נינה", partner: "בן/בת זוג", sibling: "אח/ות של רוזה", parent: "הורה של רוזה" };
+const describe = (p: StoredPerson) => {
+  if (p.replaces) return `השלמה/עדכון של מקום בעץ (${p.replaces})`;
+  const parts = [KIND[p.kind ?? ""] ?? ""];
+  if (p.parentId) parts.push(`ההורה: ${p.parentId}`);
+  if (!p.parentId && (p.kind === "grandchild" || p.kind === "great")) parts.push(`ההורה חדש: ${p.parentName || "ללא שם"}`);
+  if (p.kind === "great" && !p.parentId) parts.push(p.grandparentId ? `הסבא/סבתא: ${p.grandparentId}` : `הסבא/סבתא חדש/ה: ${p.grandparentName || "ללא שם"}`);
+  if (p.partnerOf) parts.push(`בן/בת הזוג של: ${p.partnerOf}`);
+  return parts.join(" · ");
+};
 
 /** Moderation for the family: read what was shared, approve it to the site or set it aside. */
 export default function AdminPage() {
@@ -125,7 +134,7 @@ export default function AdminPage() {
                       {person.nameAlt ? ` · ${person.nameAlt}` : ""}
                     </span>
                     <span className="text-sm text-ink-soft">
-                      {person.replaces ? `עדכון למקום בעץ: ${person.replaces}` : `${REL[person.relationType ?? ""] ?? ""} ${person.to ?? ""}`} · {new Date(person.createdAt).toLocaleString("he-IL")}
+                      {describe(person)} · {new Date(person.createdAt).toLocaleString("he-IL")}
                     </span>
                     {(person.born || person.birthplace) && <span className="text-sm">{[person.born, person.birthplace].filter(Boolean).join(" · ")}</span>}
                     {person.about && <p dir="auto" className="whitespace-pre-wrap leading-relaxed">{person.about}</p>}

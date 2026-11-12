@@ -25,17 +25,23 @@ export type StoredMemory = Base & {
   people?: string[];
 };
 
+/** A family-tree request as submitted (see FamilyRequest in lib/family). */
 export type StoredPerson = Base & {
+  kind?: "child" | "grandchild" | "great" | "partner" | "sibling" | "parent";
+  replaces?: string;
   name: string;
   nameAlt?: string;
   gender: "f" | "m" | "x";
-  relationType?: "child" | "partner" | "sibling" | "parent";
-  to?: string;
-  /** an existing slot in the tree this request fills in or updates */
-  replaces?: string;
   born?: string;
   birthplace?: string;
   about?: string;
+  parentId?: string;
+  parentName?: string;
+  parentGender?: "f" | "m" | "x";
+  grandparentId?: string;
+  grandparentName?: string;
+  grandparentGender?: "f" | "m" | "x";
+  partnerOf?: string;
 };
 
 export type NewFile = { data: Uint8Array; ext: string; kind: StoredFile["kind"] };

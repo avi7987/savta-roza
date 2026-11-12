@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { family as seed } from "@/content/family";
+import type { Gender } from "@/content/types";
+import { FamilyGraph, expandRequest, mergePeople, type FamilyRequest, type RequestKind, type TreePerson } from "@/lib/family";
 import { LIMITS, maxBytes } from "@/lib/limits";
 import { rateLimited } from "@/server/auth";
 import { sniff } from "@/server/sniff";
@@ -9,31 +11,28 @@ export const runtime = "nodejs";
 
 const clean = (v: FormDataEntryValue | null, max: number) =>
   typeof v === "string" ? v.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, max) : "";
+const gender = (v: string): Gender => (v === "f" || v === "m" ? v : "x");
+const KINDS: RequestKind[] = ["child", "grandchild", "great", "partner", "sibling", "parent"];
 
-const RELATIONS = ["child", "partner", "sibling", "parent"] as const;
+/** the public id of an approved request's main person */
+const baseId = (p: StoredPerson) => `fam-${p.id}`;
 
-/** Approved additions only, without moderation data. */
-const publicShape = (p: StoredPerson) => {
+const toRequest = (p: StoredPerson): FamilyRequest => {
   const photo = p.files.find((f) => f.kind === "image");
-  return {
-    id: p.replaces ?? `fam-${p.id}`,
-    name: p.name,
-    nameAlt: p.nameAlt,
-    gender: p.gender,
-    relationType: p.relationType,
-    to: p.to,
-    replaces: p.replaces,
-    born: p.born,
-    birthplace: p.birthplace,
-    about: p.about,
-    photoSrc: photo ? `/api/files/family/${p.id}/${photo.name}` : undefined,
-  };
+  return { ...p, photoSrc: photo ? `/api/files/family/${p.id}/${photo.name}` : undefined };
 };
 
+/** The tree built from requests with the given statuses: seed plus requests, oldest first. */
+async function treeOf(include: StoredPerson["status"][]) {
+  const all = (await familyStore.list()).filter((p) => include.includes(p.status)).reverse();
+  const people: TreePerson[] = all.flatMap((p) => expandRequest(toRequest(p), baseId(p)));
+  return { people, graph: new FamilyGraph(mergePeople(seed, people)) };
+}
+const approvedTree = () => treeOf(["approved"]);
+
 export async function GET() {
-  const approved = await familyStore.list("approved");
-  // oldest first, so a later update to the same person wins
-  return NextResponse.json({ people: approved.reverse().map(publicShape) }, { headers: { "Cache-Control": "public, max-age=60" } });
+  const { people } = await approvedTree();
+  return NextResponse.json({ people }, { headers: { "Cache-Control": "public, max-age=60" } });
 }
 
 export async function POST(req: Request) {
@@ -46,23 +45,43 @@ export async function POST(req: Request) {
   }
   if (clean(form.get("website"), 200)) return NextResponse.json({ ok: true }, { status: 202 });
 
-  const known = new Set(seed.map((p) => p.id));
-  const approved = await familyStore.list("approved");
-  approved.forEach((p) => known.add(p.replaces ?? `fam-${p.id}`));
+  // requests may build on others still waiting for approval; approving one approves what it rests on
+  const { graph } = await treeOf(["approved", "pending"]);
+  const exists = (id?: string) => !!id && graph.byId.has(id);
+  const at = (id: string | undefined, depth: number) => exists(id) && graph.depth(id!) === depth;
 
-  const name = clean(form.get("name"), LIMITS.name);
-  const nameAlt = clean(form.get("nameAlt"), LIMITS.name) || undefined;
-  const g = clean(form.get("gender"), 1);
-  const gender = g === "f" || g === "m" ? g : "x";
-  const replaces = clean(form.get("replaces"), 80) || undefined;
-  const rel = clean(form.get("relationType"), 20) as (typeof RELATIONS)[number];
-  const to = clean(form.get("to"), 80) || undefined;
-  const consent = form.get("consent") === "yes";
+  const f = (k: string, max = 80) => clean(form.get(k), max) || undefined;
+  const kind = f("kind", 20) as RequestKind | undefined;
+  const replaces = f("replaces");
+  const r: Omit<StoredPerson, "id" | "status" | "files" | "createdAt"> = {
+    kind: replaces ? undefined : kind,
+    replaces,
+    name: clean(form.get("name"), LIMITS.name),
+    nameAlt: f("nameAlt", LIMITS.name),
+    gender: gender(clean(form.get("gender"), 1)),
+    born: f("born", 20),
+    birthplace: f("birthplace"),
+    about: f("about", 600),
+    parentId: f("parentId"),
+    parentName: f("parentName", LIMITS.name),
+    parentGender: gender(clean(form.get("parentGender"), 1)),
+    grandparentId: f("grandparentId"),
+    grandparentName: f("grandparentName", LIMITS.name),
+    grandparentGender: gender(clean(form.get("grandparentGender"), 1)),
+    partnerOf: f("partnerOf"),
+  };
 
   const errors: string[] = [];
-  if (!name) errors.push("name");
-  if (!consent) errors.push("consent");
-  if (replaces ? !known.has(replaces) : !to || !known.has(to) || !RELATIONS.includes(rel)) errors.push("to");
+  if (!r.name) errors.push("name");
+  if (form.get("consent") !== "yes") errors.push("consent");
+  // every id a request points to must already be in the tree, at the right generation
+  if (replaces) {
+    if (!exists(replaces)) errors.push("to");
+  } else if (!kind || !KINDS.includes(kind)) errors.push("kind");
+  else if (kind === "grandchild" && r.parentId && !at(r.parentId, 1)) errors.push("to");
+  else if (kind === "great" && r.parentId && !at(r.parentId, 2)) errors.push("to");
+  else if (kind === "great" && !r.parentId && r.grandparentId && !at(r.grandparentId, 1)) errors.push("to");
+  else if (kind === "partner" && (!exists(r.partnerOf) || graph.partnerOf(r.partnerOf!))) errors.push("to");
 
   const files: { data: Uint8Array; ext: string; kind: "image" }[] = [];
   const photo = form.get("photo");
@@ -76,19 +95,6 @@ export async function POST(req: Request) {
 
   if (errors.length) return NextResponse.json({ error: "invalid", fields: errors }, { status: 422 });
 
-  const saved = await familyStore.create(
-    {
-      name,
-      nameAlt,
-      gender,
-      relationType: replaces ? undefined : rel,
-      to: replaces ? undefined : to,
-      replaces,
-      born: clean(form.get("born"), 20) || undefined,
-      birthplace: clean(form.get("birthplace"), 80) || undefined,
-      about: clean(form.get("about"), 600) || undefined,
-    },
-    files
-  );
-  return NextResponse.json({ ok: true, id: saved.id, status: saved.status }, { status: 201 });
+  const saved = await familyStore.create(r, files);
+  return NextResponse.json({ ok: true, id: baseId(saved), status: saved.status }, { status: 201 });
 }

@@ -1,81 +1,116 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { family as seed } from "@/content/family";
 import { photos as seedPhotos } from "@/content";
-import type { Person, Photo } from "@/content/types";
-import { FamilyGraph } from "@/lib/family";
+import type { Photo } from "@/content/types";
+import { FamilyGraph, expandRequest, mergePeople, type FamilyRequest, type TreePerson } from "@/lib/family";
 import { useLang } from "@/lib/i18n";
 import { STATIC } from "../Transition";
 
-type Addition = Person & { relationType?: "child" | "partner" | "sibling" | "parent"; to?: string; replaces?: string };
+const LOCAL_KEY = "roza-family-local";
+type LocalEntry = { id: string; req: FamilyRequest; at: string };
 
-/** Fold approved additions into the tree: fill an empty slot, or hang a new person in the right place. */
-function merge(base: Person[], additions: Addition[]) {
-  const people = base.map((p) => ({ ...p }));
-  const byId = new Map(people.map((p) => [p.id, p]));
-  for (const a of additions) {
-    if (a.replaces && byId.has(a.replaces)) {
-      Object.assign(byId.get(a.replaces)!, { ...a, id: a.replaces, placeholder: false });
-      continue;
-    }
-    const target = a.to ? byId.get(a.to) : undefined;
-    const p: Person = { ...a, placeholder: false };
-    if (target) {
-      if (a.relationType === "child") p.parents = [target.id, ...(target.partnerId ? [target.partnerId] : [])];
-      if (a.relationType === "partner") {
-        p.partnerId = target.id;
-        if (!target.partnerId) target.partnerId = p.id;
-      }
-      if (a.relationType === "sibling") p.parents = target.parents;
-      if (a.relationType === "parent") target.parents = [...(target.parents ?? []), p.id];
-    }
-    people.push(p);
-    byId.set(p.id, p);
+const readLocal = (): LocalEntry[] => {
+  try {
+    return JSON.parse(localStorage.getItem(LOCAL_KEY) ?? "[]");
+  } catch {
+    return [];
   }
-  return people;
-}
+};
 
 /** Tagged photos uploaded with approved memories join the album photos. */
 type ApprovedMemory = { id: string; photoSrc?: string; people?: string[]; author: string };
 
+/*
+  The tree a visitor sees = the seed + approved additions from the server
+  + what this visitor added themselves (shown as "waiting for approval"; in the
+  preview build these are only kept in this browser).
+*/
 export function useFamily() {
   const { lang, t } = useLang();
-  const [additions, setAdditions] = useState<Addition[]>([]);
+  const [approved, setApproved] = useState<TreePerson[]>([]);
+  const [local, setLocal] = useState<LocalEntry[]>([]);
   const [memoryPhotos, setMemoryPhotos] = useState<Photo[]>([]);
 
   useEffect(() => {
-    if (STATIC) return;
-    fetch("/api/family")
-      .then((r) => (r.ok ? r.json() : { people: [] }))
-      .then((d) => setAdditions(d.people ?? []))
-      .catch(() => {});
-    fetch("/api/memories")
-      .then((r) => (r.ok ? r.json() : { memories: [] }))
-      .then((d: { memories: ApprovedMemory[] }) =>
-        setMemoryPhotos(
-          (d.memories ?? [])
-            .filter((m) => m.photoSrc && m.people?.length)
-            .map((m) => ({ id: `mem-${m.id}`, src: m.photoSrc, full: m.photoSrc, ratio: 4 / 3, people: m.people, contributor: m.author, alt: { he: "תמונה מזיכרון", ru: "Фото из воспоминания" } }))
+    setLocal(readLocal());
+    const sync = (e: StorageEvent) => e.key === LOCAL_KEY && setLocal(readLocal());
+    window.addEventListener("storage", sync);
+    if (!STATIC) {
+      fetch("/api/family")
+        .then((r) => (r.ok ? r.json() : { people: [] }))
+        .then((d) => setApproved(d.people ?? []))
+        .catch(() => {});
+      fetch("/api/memories")
+        .then((r) => (r.ok ? r.json() : { memories: [] }))
+        .then((d: { memories: ApprovedMemory[] }) =>
+          setMemoryPhotos(
+            (d.memories ?? [])
+              .filter((m) => m.photoSrc && m.people?.length)
+              .map((m) => ({ id: `mem-${m.id}`, src: m.photoSrc, full: m.photoSrc, ratio: 4 / 3, people: m.people, contributor: m.author, alt: { he: "תמונה מזיכרון", ru: "Фото из воспоминания" } }))
+          )
         )
-      )
-      .catch(() => {});
+        .catch(() => {});
+    }
+    return () => window.removeEventListener("storage", sync);
   }, []);
 
-  const graph = useMemo(() => new FamilyGraph(merge(seed, additions)), [additions]);
+  /** keep a request this visitor sent, so they see it in the tree straight away */
+  const addLocal = useCallback((id: string, req: FamilyRequest) => {
+    const next = [...readLocal(), { id, req, at: new Date().toISOString() }];
+    try {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(next));
+    } catch {}
+    setLocal(next);
+  }, []);
+
+  const graph = useMemo(() => {
+    const approvedIds = new Set(approved.map((p) => p.id));
+    const mine = local
+      .filter((e) => !approvedIds.has(e.id))
+      .flatMap((e) => expandRequest(e.req, e.id).map((p) => ({ ...p, pending: true })));
+    return new FamilyGraph(mergePeople(mergePeople(seed, approved), mine));
+  }, [approved, local]);
+
   const photos = useMemo(() => [...seedPhotos, ...memoryPhotos], [memoryPhotos]);
 
-  const relLabel = (id: string) => {
-    const p = graph.byId.get(id);
-    return t.family.rel[graph.relation(id)][p?.gender ?? "x"];
-  };
+  const relLabel = useCallback(
+    (id: string) => {
+      const p = graph.byId.get(id);
+      return t.family.rel[graph.relation(id)][p?.gender ?? "x"];
+    },
+    [graph, t]
+  );
 
-  const nameOf = (id: string) => {
-    const p = graph.byId.get(id);
-    if (!p) return "";
-    if (p.placeholder || !p.name) return relLabel(id);
-    return lang === "ru" && p.nameAlt ? p.nameAlt : p.name;
-  };
+  const nameOf = useCallback(
+    (id: string) => {
+      const p = graph.byId.get(id);
+      if (!p) return "";
+      if (p.placeholder || !p.name) return relLabel(id);
+      return lang === "ru" && p.nameAlt ? p.nameAlt : p.name;
+    },
+    [graph, lang, relLabel]
+  );
 
-  return { graph, photos, relLabel, nameOf };
+  /** names for pickers: empty slots share a relation word, so number them */
+  const optionLabel = useCallback(
+    (ids: string[]) => {
+      const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+      const counts = new Map<string, number>();
+      ids.forEach((id) => counts.set(nameOf(id), (counts.get(nameOf(id)) ?? 0) + 1));
+      const seen = new Map<string, number>();
+      return new Map(
+        ids.map((id) => {
+          const base = nameOf(id);
+          const n = (seen.get(base) ?? 0) + 1;
+          seen.set(base, n);
+          return [id, (counts.get(base) ?? 0) > 1 ? `${cap(base)} ${n}` : cap(base)];
+        })
+      );
+    },
+    [nameOf]
+  );
+
+  return { graph, photos, relLabel, nameOf, optionLabel, addLocal };
 }

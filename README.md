@@ -35,10 +35,12 @@ ADMIN_TOKEN="a-long-private-password" npm run dev
 
 ## Family tree
 
-- People live in `src/content/family.ts`. Each person only needs `parents` and/or `partnerId`; every relation to Rosa ("granddaughter", "son-in-law", "great-grandson"…) is calculated, in Hebrew and Russian, with the right grammatical gender.
-- Empty slots (`placeholder: true`) show their relation until someone fills them in.
-- Visitors use "Add yourself to the tree" to join (as a child, partner, sibling or parent of someone) or to fill in / update an existing slot. Requests wait for approval in `/admin` → "עץ המשפחה".
-- Photos are linked to people through `people: [...]` on each photo, and through the "Who is in the photos?" picker in the share form. A person's card shows "your photos together with Rosa" and "all photos of …".
+- The tree starts with Rosa and her husband only (`src/content/family.ts`) and grows from what the family adds. A ring appears for each generation as soon as someone is in it.
+- "Add to the tree" asks the relationship to Rosa first (child, grandchild, great-grandchild, partner, sibling, parent), then through whom. If a grandchild's parent is not in the tree yet, choose "not in the tree yet": a slot for the parent is created (named or empty) so the ring of children appears too. A path preview shows where the person will land.
+- "+" next to anyone in the tree (and in each person's card) opens the form already set to "child of …" or "partner of …".
+- Relations ("granddaughter", "son-in-law", "great-grandson"…) are calculated in Hebrew and Russian with the right grammatical gender.
+- Requests wait for approval in `/admin` → "עץ המשפחה". Approving a person also approves the pending people they hang from. Visitors see their own additions right away, marked "waiting for approval".
+- Photos are linked to people through `people: [...]` on each photo and the "Who is in the photos?" picker in the share form; a person's card shows "your photos together with Rosa" and "all photos of …".
 
 ## Memories and moderation
 
