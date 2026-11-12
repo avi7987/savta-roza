@@ -2,13 +2,12 @@
 
 import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
-import { photoById, profile } from "@/content";
+import { profile } from "@/content";
 import { useLang } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
-import ArchivalImage from "../ArchivalImage";
 import { RoseBranch } from "../Botanical";
 import { TLink } from "../Transition";
-import { PlaceholderTag, buttonClass } from "../ui";
+import { buttonClass } from "../ui";
 
 const enter = (delay: number) => ({
   initial: { opacity: 0, y: 18 },
@@ -22,11 +21,8 @@ export default function Hero() {
   const reduce = useReducedMotion();
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
   const photoY = useTransform(scrollYProgress, [0, 1], [0, reduce ? 0 : -70]);
-  const smallY = useTransform(scrollYProgress, [0, 1], [0, reduce ? 0 : -130]);
   const branchY = useTransform(scrollYProgress, [0, 1], [0, reduce ? 0 : -30]);
 
-  const portrait = photoById(profile.portraitId)!;
-  const second = photoById(profile.secondaryPortraitId);
 
   return (
     <section id="top" ref={ref} aria-labelledby="hero-title" className="relative overflow-hidden pb-[clamp(4rem,9vw,8rem)] pt-[calc(4.5rem+env(safe-area-inset-top,0px))]">
@@ -78,24 +74,26 @@ export default function Hero() {
             </motion.div>
 
             <motion.figure style={{ y: photoY }} className="relative z-10">
-              <ArchivalImage photo={portrait} mount priority sizes="(min-width: 768px) 40vw, 86vw" />
-              <figcaption className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-[0.85rem] text-ink-soft">
-                <span className="font-display text-base text-charcoal/80">{l(portrait.caption)}</span>
-                {portrait.placeholder && <PlaceholderTag short />}
-              </figcaption>
-            </motion.figure>
-
-            {second && (
               <motion.div
-                style={{ y: smallY }}
-                initial={{ opacity: 0, rotate: -6, y: 30 }}
-                animate={{ opacity: 1, rotate: -3 }}
-                transition={{ duration: 1.1, delay: 0.9, ease }}
-                className="absolute -top-[6%] -start-[10%] z-20 w-[30%] bg-white p-1.5 pb-4 shadow-[var(--shadow-lift)] md:-start-[20%] md:top-[14%] md:w-[34%] md:p-2 md:pb-6"
-              >
-                <ArchivalImage photo={second} reveal={false} labelled={false} className="[&>div]:shadow-none" />
-              </motion.div>
-            )}
+                aria-hidden
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 1.4, delay: 0.2, ease }}
+                className="absolute inset-x-[4%] bottom-[2%] top-[4%] rounded-full bg-[radial-gradient(circle_at_50%_42%,#efdcd9_0%,#e8d4d3_52%,rgba(232,212,211,0)_71%)]"
+              />
+              <motion.img
+                src="/images/rosa-portrait.webp"
+                alt={t.hero.portraitAlt}
+                width={900}
+                height={862}
+                fetchPriority="high"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 1.3, delay: 0.35, ease }}
+                className="relative block h-auto w-full"
+              />
+              <figcaption className="relative mt-1 text-center text-[0.8rem] text-ink-soft">{t.hero.portraitNote}</figcaption>
+            </motion.figure>
           </div>
         </div>
       </div>

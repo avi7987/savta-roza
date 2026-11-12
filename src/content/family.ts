@@ -12,6 +12,6 @@ export const MOTHER = "p-mother";
 export const FATHER = "p-father";
 
 export const family: Person[] = [
-  { id: ROSA, name: "רוזה", nameAlt: "Роза", gender: "f", parents: [MOTHER, FATHER], partnerId: HUSBAND },
+  { id: ROSA, name: "רוזה", nameAlt: "Роза", gender: "f", born: "1938", photoSrc: "/images/rosa-avatar.webp", parents: [MOTHER, FATHER], partnerId: HUSBAND },
   { id: HUSBAND, name: "", gender: "m", partnerId: ROSA, placeholder: true },
 ];
