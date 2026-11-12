@@ -10,6 +10,7 @@ import MediaArchive from "@/components/sections/MediaArchive";
 import Memories from "@/components/sections/Memories";
 import PhotoGallery from "@/components/sections/PhotoGallery";
 import Story from "@/components/sections/Story";
+import FamilyTree from "@/components/family/FamilyTree";
 import { Divider } from "@/components/Botanical";
 
 export default function Home() {
@@ -19,6 +20,7 @@ export default function Home() {
       <main id="content">
         <Hero />
         <Story />
+        <FamilyTree />
         <LifeTimeline />
         <PhotoGallery />
         <Divider />

@@ -28,6 +28,31 @@ export type Photo = {
   /** editorial size in the gallery */
   size?: "feature" | "wide" | "tall" | "standard";
   contributor?: string;
+  /** ids of the people in the photograph (see `family`) */
+  people?: string[];
+  placeholder?: boolean;
+};
+
+export type Gender = "f" | "m" | "x";
+
+/**
+ * One person in the family tree. Relations to Rosa are worked out from `parents`
+ * and `partnerId`, so nobody has to type "granddaughter" by hand.
+ */
+export type Person = {
+  id: string;
+  name: string;
+  /** the same name in the other script, e.g. Cyrillic for a Hebrew name */
+  nameAlt?: string;
+  gender?: Gender;
+  parents?: string[];
+  partnerId?: string;
+  /** optional full details, shown only when the person chose to add them */
+  born?: string;
+  birthplace?: string;
+  died?: string;
+  about?: string;
+  photoSrc?: string;
   placeholder?: boolean;
 };
 

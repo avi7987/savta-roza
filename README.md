@@ -33,6 +33,13 @@ ADMIN_TOKEN="a-long-private-password" npm run dev
 3. Replace placeholder text in `story`, `milestones`, `notes` and `media` with the family's words, and remove `placeholder: true`.
 4. Years appear on the timeline only when `year` is filled in. Nothing is shown that the family has not provided.
 
+## Family tree
+
+- People live in `src/content/family.ts`. Each person only needs `parents` and/or `partnerId`; every relation to Rosa ("granddaughter", "son-in-law", "great-grandson"…) is calculated, in Hebrew and Russian, with the right grammatical gender.
+- Empty slots (`placeholder: true`) show their relation until someone fills them in.
+- Visitors use "Add yourself to the tree" to join (as a child, partner, sibling or parent of someone) or to fill in / update an existing slot. Requests wait for approval in `/admin` → "עץ המשפחה".
+- Photos are linked to people through `people: [...]` on each photo, and through the "Who is in the photos?" picker in the share form. A person's card shows "your photos together with Rosa" and "all photos of …".
+
 ## Memories and moderation
 
 - Visitors submit through `/share`. Text is cleaned, files are checked by their actual bytes (not their name), size-limited, and stored under generated names.

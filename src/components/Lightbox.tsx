@@ -9,6 +9,7 @@ import { ease } from "@/lib/motion";
 import ArchivalImage from "./ArchivalImage";
 import { getLenis } from "./Transition";
 import { PlaceholderTag } from "./ui";
+import Portal from "./Portal";
 
 type Ctx = { open: (photos: Photo[], index: number) => void };
 const LightboxCtx = createContext<Ctx>({ open: () => {} });
@@ -31,7 +32,9 @@ export function LightboxProvider({ children }: { children: ReactNode }) {
   return (
     <LightboxCtx.Provider value={{ open }}>
       {children}
+      <Portal>
       <AnimatePresence>{state && <ImageLightbox key="lb" photos={state.photos} index={state.index} onIndex={(i) => setState({ ...state, index: i })} onClose={close} />}</AnimatePresence>
+      </Portal>
     </LightboxCtx.Provider>
   );
 }

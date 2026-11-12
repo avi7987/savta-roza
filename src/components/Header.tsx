@@ -46,6 +46,7 @@ export function LanguageSwitcher({ className, large }: { className?: string; lar
 const LINKS = [
   { id: "top", key: "home" },
   { id: "story", key: "story" },
+  { id: "family", key: "family" },
   { id: "gallery", key: "gallery" },
   { id: "memories", key: "memories" },
 ] as const;
@@ -66,7 +67,7 @@ export default function Header() {
       (entries) => entries.forEach((e) => e.isIntersecting && setActive(e.target.id)),
       { rootMargin: "-45% 0px -50% 0px" }
     );
-    ["top", "story", "timeline", "gallery", "memories", "letters", "media", "contribute"].forEach((id) => {
+    ["top", "story", "family", "timeline", "gallery", "memories", "letters", "media", "contribute"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) io.observe(el);
     });

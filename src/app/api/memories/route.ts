@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { LIMITS, detectLang, maxBytes } from "@/lib/limits";
 import { rateLimited } from "@/server/auth";
 import { sniff } from "@/server/sniff";
-import { store, type StoredMemory } from "@/server/store";
+import { family as seed } from "@/content/family";
+import { familyStore, store, type StoredMemory } from "@/server/store";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,8 @@ const publicShape = (m: StoredMemory) => {
     body: m.body,
     lang: m.lang,
     createdAt: m.createdAt,
-    photoSrc: image ? `/api/files/${m.id}/${image.name}` : undefined,
+    photoSrc: image ? `/api/files/memories/${m.id}/${image.name}` : undefined,
+    people: m.people,
     mediaKind: media?.kind,
   };
 };
@@ -48,6 +50,10 @@ export async function POST(req: Request) {
   const relation = clean(form.get("relation"), LIMITS.relation) || undefined;
   const title = clean(form.get("title"), LIMITS.title) || undefined;
   const body = clean(form.get("memory"), LIMITS.body);
+  // only ids that exist in the tree can be tagged
+  const known = new Set(seed.map((p) => p.id));
+  (await familyStore.list("approved")).forEach((p) => known.add(p.replaces ?? `fam-${p.id}`));
+  const people = Array.from(new Set(form.getAll("people").filter((v): v is string => typeof v === "string" && known.has(v)))).slice(0, 40);
   const uploads = form.getAll("files").filter((f): f is File => typeof f !== "string" && f.size > 0);
 
   const errors: string[] = [];
@@ -72,7 +78,7 @@ export async function POST(req: Request) {
 
   if (errors.length) return NextResponse.json({ error: "invalid", fields: Array.from(new Set(errors)) }, { status: 422 });
 
-  const saved = await store.create({ author, relation, title, body, lang: detectLang(`${title ?? ""} ${body}`) }, files);
+  const saved = await store.create({ author, relation, title, body, people: people.length ? people : undefined, lang: detectLang(`${title ?? ""} ${body}`) }, files);
   // new memories wait for a moderator; nothing is published automatically
   return NextResponse.json({ ok: true, id: saved.id, status: saved.status }, { status: 201 });
 }

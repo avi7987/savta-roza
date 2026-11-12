@@ -1,14 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { StoredMemory, Status } from "@/server/store";
+import type { StoredMemory, StoredPerson, Status } from "@/server/store";
+
+type Kind = "memories" | "family";
+const REL: Record<string, string> = { child: "הילד/ה של", partner: "בן/בת הזוג של", sibling: "אח/ות של", parent: "הורה של" };
 
 /** Moderation for the family: read what was shared, approve it to the site or set it aside. */
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
   const [tab, setTab] = useState<Status>("pending");
-  const [items, setItems] = useState<StoredMemory[]>([]);
+  const [kind, setKind] = useState<Kind>("memories");
+  const [items, setItems] = useState<(StoredMemory | StoredPerson)[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -19,9 +23,9 @@ export default function AdminPage() {
   }, []);
 
   const load = useCallback(
-    async (tk = token, status = tab) => {
+    async (tk = token, status = tab, k = kind) => {
       setError("");
-      const res = await fetch(`/api/admin/memories?status=${status}`, { headers: { "x-admin-token": tk } });
+      const res = await fetch(`/api/admin/memories?status=${status}&kind=${k}`, { headers: { "x-admin-token": tk } });
       if (res.status === 401) {
         setAuthed(false);
         setError("הסיסמה לא נכונה");
@@ -34,11 +38,11 @@ export default function AdminPage() {
         sessionStorage.setItem("roza-admin", tk);
       } catch {}
     },
-    [token, tab]
+    [token, tab, kind]
   );
 
   const decide = async (id: string, status: Status) => {
-    const res = await fetch(`/api/memories/${id}`, { method: "PATCH", headers: { "x-admin-token": token, "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
+    const res = await fetch(`/api/${kind === "family" ? "family" : "memories"}/${id}`, { method: "PATCH", headers: { "x-admin-token": token, "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
     if (res.ok) setItems((all) => all.filter((m) => m.id !== id));
     else setError("הפעולה לא הצליחה, נסו שוב");
   };
@@ -73,7 +77,23 @@ export default function AdminPage() {
         </form>
       ) : (
         <>
-          <div role="tablist" className="mt-10 flex gap-2 border-b border-line">
+          <div className="mt-10 flex gap-3">
+            {(["memories", "family"] as Kind[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={kind === k}
+                onClick={() => {
+                  setKind(k);
+                  load(token, tab, k);
+                }}
+                className={`min-h-11 rounded-full px-5 ${kind === k ? "bg-burgundy text-white" : "border border-charcoal/20 text-charcoal"}`}
+              >
+                {k === "memories" ? "זיכרונות" : "עץ המשפחה"}
+              </button>
+            ))}
+          </div>
+          <div role="tablist" className="mt-6 flex gap-2 border-b border-line">
             {tabs.map((tb) => (
               <button
                 key={tb.id}
@@ -81,7 +101,7 @@ export default function AdminPage() {
                 aria-selected={tab === tb.id}
                 onClick={() => {
                   setTab(tb.id);
-                  load(token, tb.id);
+                  load(token, tb.id, kind);
                 }}
                 className={`min-h-11 px-4 ${tab === tb.id ? "border-b-2 border-burgundy text-burgundy" : "text-ink-soft"}`}
               >
@@ -92,8 +112,26 @@ export default function AdminPage() {
           {error && <p role="alert" className="mt-4 text-burgundy">{error}</p>}
           {items.length === 0 && <p className="mt-10 text-ink-soft">אין כאן כרגע זיכרונות.</p>}
           <ul className="mt-8 flex flex-col gap-6">
-            {items.map((m) => (
+            {items.map((item) => {
+              const m = item as StoredMemory;
+              const person = item as StoredPerson;
+              const collection = kind;
+              return (
               <li key={m.id} className="rounded-md bg-white p-6 shadow-[var(--shadow-paper)]">
+                {kind === "family" ? (
+                  <div className="flex flex-col gap-2">
+                    <span className="font-display text-xl text-burgundy">
+                      {person.name}
+                      {person.nameAlt ? ` · ${person.nameAlt}` : ""}
+                    </span>
+                    <span className="text-sm text-ink-soft">
+                      {person.replaces ? `עדכון למקום בעץ: ${person.replaces}` : `${REL[person.relationType ?? ""] ?? ""} ${person.to ?? ""}`} · {new Date(person.createdAt).toLocaleString("he-IL")}
+                    </span>
+                    {(person.born || person.birthplace) && <span className="text-sm">{[person.born, person.birthplace].filter(Boolean).join(" · ")}</span>}
+                    {person.about && <p dir="auto" className="whitespace-pre-wrap leading-relaxed">{person.about}</p>}
+                  </div>
+                ) : (
+                <>
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <span className="font-display text-xl text-burgundy">{m.title || "ללא כותרת"}</span>
                   <span className="text-sm text-ink-soft">
@@ -104,6 +142,9 @@ export default function AdminPage() {
                 <p lang={m.lang} dir="auto" className="mt-3 whitespace-pre-wrap leading-relaxed text-charcoal">
                   {m.body}
                 </p>
+                {m.people?.length ? <p className="mt-2 text-sm text-ink-soft">מסומנים: {m.people.join(", ")}</p> : null}
+                </>
+                )}
                 {m.files.length > 0 && (
                   <ul className="mt-4 flex flex-wrap gap-2 text-sm">
                     {m.files.map((f) => (
@@ -112,7 +153,7 @@ export default function AdminPage() {
                           type="button"
                           className="rounded-full border border-line px-3 py-1 text-burgundy"
                           onClick={async () => {
-                            const r = await fetch(`/api/files/${m.id}/${f.name}`, { headers: { "x-admin-token": token } });
+                            const r = await fetch(`/api/files/${collection}/${m.id}/${f.name}`, { headers: { "x-admin-token": token } });
                             if (r.ok) window.open(URL.createObjectURL(await r.blob()), "_blank");
                           }}
                         >
@@ -135,7 +176,8 @@ export default function AdminPage() {
                   )}
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         </>
       )}

@@ -9,6 +9,8 @@ import { ease } from "@/lib/motion";
 import { RoseTop } from "./Botanical";
 import { STATIC } from "./Transition";
 import { buttonClass, cn } from "./ui";
+import { useFamily } from "./family/useFamily";
+import PersonAvatar from "./family/PersonAvatar";
 
 type Picked = { file: File; url?: string; kind: "image" | "video" | "audio" };
 
@@ -43,6 +45,10 @@ export default function MemorySubmissionForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [over, setOver] = useState(false);
+  const [tagged, setTagged] = useState<string[]>([]);
+  const fam = useFamily();
+  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+  const tagOptions = fam.graph.people.filter((p) => !p.placeholder).sort((a, b) => (fam.graph.ring(a.id) ?? 9) - (fam.graph.ring(b.id) ?? 9));
 
   useEffect(() => () => files.forEach((f) => f.url && URL.revokeObjectURL(f.url)), [files]);
 
@@ -98,6 +104,7 @@ export default function MemorySubmissionForm() {
   const reset = () => {
     setValues({ name: "", relation: "", title: "", memory: "" });
     setFiles([]);
+    setTagged([]);
     setErrors({});
     setState("idle");
   };
@@ -219,6 +226,37 @@ export default function MemorySubmissionForm() {
               </ul>
             )}
           </Field>
+
+          {files.some((f) => f.kind !== "audio") && tagOptions.length > 0 && (
+            <fieldset className="flex flex-col gap-3">
+              <legend className="mb-1 text-[0.98rem] text-charcoal">{s.people}</legend>
+              <p className="text-[0.82rem] text-ink-soft">{s.peopleHint}</p>
+              <div className="flex flex-wrap gap-2">
+                {tagOptions.map((p) => {
+                  const on = tagged.includes(p.id);
+                  const label = cap(fam.nameOf(p.id));
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setTagged((cur) => (on ? cur.filter((x) => x !== p.id) : [...cur, p.id]))}
+                      className={cn(
+                        "inline-flex min-h-11 items-center gap-2 rounded-full border py-1 pe-4 ps-1 text-[0.9rem] transition-colors",
+                        on ? "border-burgundy bg-burgundy text-white" : "border-charcoal/15 bg-white text-charcoal hover:border-burgundy/40"
+                      )}
+                    >
+                      <PersonAvatar person={p} label={label} className="w-8 text-[0.7rem]" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {tagged.map((id) => (
+                <input key={id} type="hidden" name="people" value={id} />
+              ))}
+            </fieldset>
+          )}
 
           {state === "error" && (
             <p role="alert" className="rounded-[var(--radius-card)] bg-blush/50 px-4 py-3 text-burgundy">
