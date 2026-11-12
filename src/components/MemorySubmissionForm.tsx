@@ -131,7 +131,7 @@ export default function MemorySubmissionForm() {
       fd.append("files", f.file);
       if (f.prep?.thumb) fd.append(`thumb-${i}`, f.prep.thumb, "thumb.jpg");
     });
-    fd.set("filesMeta", JSON.stringify(sendable.map((f) => ({ date: f.prep?.date, width: f.prep?.width, height: f.prep?.height, sha: f.prep?.sha, phash: f.prep?.phash }))));
+    fd.set("filesMeta", JSON.stringify(sendable.map((f) => ({ date: f.prep?.date, nameDate: f.prep?.nameDate, width: f.prep?.width, height: f.prep?.height, sha: f.prep?.sha, phash: f.prep?.phash }))));
     fd.set("when", JSON.stringify({ mode: when.mode, date: when.date, year: Number(when.year) || undefined, decade: when.decade }));
     if (category) fd.set("category", category);
     try {
@@ -276,7 +276,7 @@ export default function MemorySubmissionForm() {
                     )}
                     {f.kind !== "audio" && !blocked(f) && (
                       <span className="absolute inset-x-1 bottom-1 truncate rounded bg-white/90 px-1.5 py-0.5 text-center text-[0.68rem] text-charcoal">
-                        {f.preparing ? "…" : f.prep?.date ? `${formatDate({ source: "exif", date: f.prep.date }, lang)} · ${s.fromFile}` : s.noDate}
+                        {f.preparing ? "…" : (f.prep?.date ?? f.prep?.nameDate) ? `${formatDate({ source: "exif", date: (f.prep?.date ?? f.prep?.nameDate)! }, lang)} · ${s.fromFile}` : s.noDate}
                       </span>
                     )}
                     <button

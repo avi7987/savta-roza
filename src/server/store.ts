@@ -26,7 +26,13 @@ export type StoredFile = {
   /** fingerprints for recognising the same photo twice (see lib/dedupe) */
   sha?: string;
   phash?: string;
+  /** someone asked the owner to remove this file */
+  deleteRequest?: DeleteRequest;
+  /** last time the date estimate was tried (so it is retried later, not on every visit) */
+  aiTriedAt?: string;
 };
+
+export type DeleteRequest = { at: string; reason?: string; by?: string };
 
 export type Base = { id: string; status: Status; files: StoredFile[]; createdAt: string; reviewedAt?: string };
 
@@ -38,6 +44,8 @@ export type StoredMemory = Base & {
   lang: "he" | "ru";
   /** family-tree ids of the people in the attached photos */
   people?: string[];
+  /** someone asked the owner to remove this whole memory */
+  deleteRequest?: DeleteRequest;
 };
 
 /** A family-tree request as submitted (see FamilyRequest in lib/family). */
@@ -73,7 +81,9 @@ export type NewFile = {
 };
 
 export interface Store<T extends Base> {
-  create(fields: Omit<T, keyof Base>, files: NewFile[]): Promise<T>;
+  create(fields: Omit<T, keyof Base>, files: NewFile[], status?: Status): Promise<T>;
+  /** delete one file of a record (and its preview); returns the bytes freed */
+  removeFile(id: string, name: string): Promise<number>;
   list(status?: Status): Promise<T[]>;
   get(id: string): Promise<T | undefined>;
   setStatus(id: string, status: Status): Promise<T | undefined>;
@@ -113,7 +123,8 @@ function lazy<T extends Base>(collection: string): Store<T> {
   let p: Promise<Store<T>> | null = null;
   const b = () => (p ??= backend<T>(collection));
   return {
-    create: async (f, files) => (await b()).create(f, files),
+    create: async (f, files, s) => (await b()).create(f, files, s),
+    removeFile: async (id, n) => (await b()).removeFile(id, n),
     list: async (s) => (await b()).list(s),
     get: async (id) => (await b()).get(id),
     setStatus: async (id, s) => (await b()).setStatus(id, s),

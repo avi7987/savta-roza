@@ -34,15 +34,17 @@ export async function analyzeMemory(id: string, opts: { only?: string; force?: b
     if (!bytes) continue;
     results.set(f.name, await estimatePhoto(bytes, { rosaInPhoto: m.people?.includes(ROSA) }));
   }
+  const tried = new Date().toISOString();
   if (!results.size) return m;
   return store.update(id, (cur: StoredMemory) => ({
     ...cur,
     files: cur.files.map((f) => {
       if (!results.has(f.name)) return f;
       const est = results.get(f.name)!;
+      if (!est) return { ...f, aiTriedAt: tried };
       const user = opts.force ? undefined : f.date?.source === "user" ? f.date : undefined;
       const exif = f.date?.source === "exif" ? f.date : undefined;
-      return { ...f, date: chooseDate(user, exif, est) ?? f.date, category: f.category ?? est?.category };
+      return { ...f, aiTriedAt: tried, date: chooseDate(user, exif, est) ?? f.date, category: f.category ?? est?.category };
     }),
   }));
 }

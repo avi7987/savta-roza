@@ -11,6 +11,8 @@ import ArchivalImage from "./ArchivalImage";
 import { getLenis } from "./Transition";
 import { PlaceholderTag } from "./ui";
 import Portal from "./Portal";
+import { DecadePicker, RemovalRequest } from "./PhotoActions";
+import type { PhotoDate } from "@/lib/photoDate";
 
 type Ctx = { open: (photos: Photo[], index: number) => void };
 const LightboxCtx = createContext<Ctx>({ open: () => {} });
@@ -45,7 +47,9 @@ function ImageLightbox({ photos, index, onIndex, onClose }: { photos: Photo[]; i
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const [direction, setDirection] = useState(0);
-  const photo = photos[index];
+  const [dated, setDated] = useState<Record<string, PhotoDate>>({});
+  const base = photos[index];
+  const photo = dated[base.id] ? { ...base, when: dated[base.id] } : base;
   const many = photos.length > 1;
 
   const go = useCallback(
@@ -66,7 +70,7 @@ function ImageLightbox({ photos, index, onIndex, onClose }: { photos: Photo[]; i
       if (e.key === "ArrowLeft") go(dir === "rtl" ? 1 : -1);
       if (e.key === "ArrowRight") go(dir === "rtl" ? -1 : 1);
       if (e.key === "Tab" && dialog.current) {
-        const f = dialog.current.querySelectorAll<HTMLElement>("button");
+        const f = dialog.current.querySelectorAll<HTMLElement>("button, input, textarea");
         const first = f[0];
         const last = f[f.length - 1];
         if (e.shiftKey && document.activeElement === first) {
@@ -130,7 +134,7 @@ function ImageLightbox({ photos, index, onIndex, onClose }: { photos: Photo[]; i
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.4}
             onDragEnd={onDragEnd}
-            className="flex max-h-full w-full max-w-5xl touch-pan-y flex-col items-center gap-5"
+            className="flex max-h-full w-full max-w-5xl touch-pan-y flex-col items-center gap-5 overflow-y-auto py-2"
           >
             <div className="w-full" style={{ maxWidth: `min(100%, calc(72svh * ${photo.ratio}))` }}>
               {photo.kind === "video" && photo.full ? (
@@ -159,6 +163,10 @@ function ImageLightbox({ photos, index, onIndex, onClose }: { photos: Photo[]; i
                 )}
                 {photo.placeholder && <PlaceholderTag short className="border-ivory/30 text-ivory/70" />}
               </span>
+              {photo.memoryId && photo.file && (!base.when || base.when.source === "ai") && (
+                <DecadePicker key={`d-${photo.id}`} memoryId={photo.memoryId} file={photo.file} tone="dark" onDated={(d) => setDated((m) => ({ ...m, [photo.id]: d }))} />
+              )}
+              {photo.memoryId && photo.file && <RemovalRequest key={`r-${photo.id}`} memoryId={photo.memoryId} file={photo.file} requested={photo.removalRequested} tone="dark" />}
             </figcaption>
           </motion.figure>
         </AnimatePresence>

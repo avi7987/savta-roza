@@ -26,7 +26,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
   if (!s) return new Response("Not found", { status: 404 });
   const record = await s.get(id);
   if (!record || !record.files.some((f) => f.name === name || f.thumb === name)) return new Response("Not found", { status: 404 });
-  if (record.status !== "approved" && !(await isAdmin(req))) return new Response("Not found", { status: 404 });
+  // memories are public as soon as they are shared (until the owner removes them); family requests need approval
+  const visible = collection === "memories" ? record.status !== "rejected" : record.status === "approved";
+  if (!visible && !(await isAdmin(req))) return new Response("Not found", { status: 404 });
   const data = await s.readFile(id, name);
   if (!data) return new Response("Not found", { status: 404 });
   const ext = name.split(".").pop() ?? "";
@@ -35,7 +37,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
       "Content-Type": TYPES[ext] ?? "application/octet-stream",
       "Content-Disposition": "inline",
       "X-Content-Type-Options": "nosniff",
-      "Cache-Control": record.status === "approved" ? "public, max-age=31536000, immutable" : "no-store",
+      "Cache-Control": visible ? "public, max-age=31536000, immutable" : "no-store",
     },
   });
 }

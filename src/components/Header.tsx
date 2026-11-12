@@ -44,11 +44,11 @@ export function LanguageSwitcher({ className, large }: { className?: string; lar
 }
 
 const LINKS = [
-  { id: "top", key: "home" },
-  { id: "story", key: "story" },
-  { id: "family", key: "family" },
-  { id: "gallery", key: "gallery" },
-  { id: "memories", key: "memories" },
+  { id: "top", key: "home", href: "/#top" },
+  { id: "story", key: "story", href: "/#story" },
+  { id: "family", key: "family", href: "/#family" },
+  { id: "memories", key: "memories", href: "/#memories" },
+  { id: "gallery", key: "gallery", href: "/gallery" },
 ] as const;
 
 export default function Header() {
@@ -117,7 +117,7 @@ export default function Header() {
             {LINKS.map((link) => (
               <TLink
                 key={link.id}
-                href={`/#${link.id}`}
+                href={link.href}
                 aria-current={navActive(link.id) ? "true" : undefined}
                 className={cn("relative px-3.5 py-3 text-[0.95rem] transition-colors", navActive(link.id) ? "text-burgundy" : "text-charcoal/75 hover:text-charcoal")}
               >
@@ -175,9 +175,9 @@ export default function Header() {
               </button>
             </div>
             <nav aria-label={t.nav.menu} className="mt-10 flex flex-col">
-              {[...LINKS, { id: "timeline", key: "timeline" as const }].map((link, i) => (
+              {LINKS.map((link, i) => (
                 <motion.div key={link.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.05, duration: 0.5, ease }}>
-                  <TLink href={`/#${link.id}`} onClick={() => setOpen(false)} className="flex items-baseline gap-4 border-b border-line py-4">
+                  <TLink href={link.href} onClick={() => setOpen(false)} className="flex items-baseline gap-4 border-b border-line py-4">
                     <span className="font-display text-[2.1rem] font-light leading-tight text-charcoal">{t.nav[link.key]}</span>
                   </TLink>
                 </motion.div>

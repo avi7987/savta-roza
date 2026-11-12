@@ -18,7 +18,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as {
     status?: string;
-    files?: { name: string; date?: { date?: string; year?: number; from?: number; to?: number } | null; category?: string; sha?: string; phash?: string }[];
+    files?: { name: string; date?: { date?: string; year?: number; from?: number; to?: number } | null; category?: string; sha?: string; phash?: string; keep?: boolean }[];
+    /** owner removes one photo of the memory */
+    removeFile?: string;
+    /** owner declines a request to remove the whole memory */
+    keep?: boolean;
   };
   const { status } = body;
   if (status !== undefined && status !== "approved" && status !== "rejected" && status !== "pending") return NextResponse.json({ error: "status" }, { status: 400 });
@@ -35,9 +39,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         if (!e) return f;
         const date = e.date === null ? undefined : e.date ? cleanDate(e.date, "user") ?? f.date : f.date;
         const category = e.category === "" ? undefined : CATEGORIES.includes(e.category as CategoryId) ? (e.category as CategoryId) : f.category;
-        return { ...f, date, category, sha: f.sha ?? (isSha(e.sha) ? e.sha : undefined), phash: f.phash ?? (isPhash(e.phash) ? e.phash : undefined) };
+        return { ...f, date, category, deleteRequest: e.keep ? undefined : f.deleteRequest, sha: f.sha ?? (isSha(e.sha) ? e.sha : undefined), phash: f.phash ?? (isPhash(e.phash) ? e.phash : undefined) };
       }),
     }));
+  }
+  if (body.keep) updated = await store.update(id, (cur) => ({ ...cur, deleteRequest: undefined }));
+  if (body.removeFile) {
+    await store.removeFile(id, body.removeFile);
+    updated = await store.get(id);
+    // a memory left with no words and no photos has nothing to show
+    if (updated && !updated.files.length && !updated.body?.trim()) updated = await store.setStatus(id, "rejected");
   }
   if (status) {
     updated = await store.setStatus(id, status);

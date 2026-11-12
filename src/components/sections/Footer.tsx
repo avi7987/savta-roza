@@ -13,9 +13,9 @@ export default function Footer() {
   const { t, l } = useLang();
   const links = [
     { href: "/#story", label: t.nav.story },
-    { href: "/#timeline", label: t.nav.timeline },
-    { href: "/#gallery", label: t.nav.gallery },
+    { href: "/#family", label: t.nav.family },
     { href: "/#memories", label: t.nav.memories },
+    { href: "/gallery", label: t.nav.gallery },
     { href: "/share", label: t.nav.share },
   ];
   return (

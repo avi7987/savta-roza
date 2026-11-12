@@ -2,13 +2,13 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, Image as ImageIcon, LogOut, Mic, RefreshCw, Undo2, Video, X } from "lucide-react";
+import { Check, ExternalLink, Flag, Image as ImageIcon, LogOut, Mic, RefreshCw, Trash2, Undo2, Video, X } from "lucide-react";
 import { family as seed } from "@/content/family";
 import { FamilyGraph, expandRequest, mergePeople, type TreePerson } from "@/lib/family";
 import type { Status, StoredFile, StoredMemory, StoredPerson } from "@/server/store";
 import { RoseBud } from "@/components/Botanical";
 import { cn } from "@/components/ui";
-import { formatDate, sourceLabel } from "@/lib/photoDate";
+import { decadeLabel, decadeOf, formatDate, sortYear, sourceLabel } from "@/lib/photoDate";
 import { sha256, thumbFromBlob } from "@/lib/mediaPrep";
 import { compare } from "@/lib/dedupe";
 import type { CategoryId } from "@/content/types";
@@ -96,13 +96,121 @@ function FileMeta({ memoryId, file, token, onSaved }: { memoryId: string; file: 
 }
 
 type Kind = "memories" | "family";
+type Section = "removals" | "memories" | "family" | "story";
 type Item = StoredMemory | StoredPerson;
 
 const TABS: { id: Status; label: string; empty: string }[] = [
   { id: "pending", label: "ממתינים לאישור", empty: "אין כרגע שום דבר שמחכה לאישור." },
-  { id: "approved", label: "מופיעים באתר", empty: "עוד לא אושר כאן שום דבר." },
-  { id: "rejected", label: "לא פורסמו", empty: "לא נדחה כאן שום דבר." },
+  { id: "approved", label: "מופיעים באתר", empty: "עוד אין כאן שום דבר." },
+  { id: "rejected", label: "הוסרו", empty: "לא הוסר שום דבר." },
 ];
+
+type Notes = Record<string, { title?: string; text?: string; titleRu?: string; textRu?: string }>;
+const ALL_DECADES = [1920, 1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
+
+/** Optional words for each decade of the life story. Photos fill the decades on their own. */
+function StoryEditor({ token, memories, onSaved }: { token: string; memories: StoredMemory[]; onSaved: (msg: string) => void }) {
+  const [notes, setNotes] = useState<Notes>({});
+  const [extra, setExtra] = useState<number[]>([]);
+  const [busy, setBusy] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/story")
+      .then((r) => (r.ok ? r.json() : { decades: {} }))
+      .then((d: { decades: Notes }) => setNotes(d.decades ?? {}))
+      .catch(() => {});
+  }, []);
+
+  const counts = useMemo(() => {
+    const c = new Map<number, number>();
+    for (const m of memories) {
+      if (m.status === "rejected") continue;
+      for (const f of m.files) {
+        const y = sortYear(f.date);
+        if (y) c.set(decadeOf(y), (c.get(decadeOf(y)) ?? 0) + 1);
+      }
+    }
+    return c;
+  }, [memories]);
+
+  const decades = Array.from(new Set([...counts.keys(), ...Object.keys(notes).map(Number), ...extra])).sort((a, b) => a - b);
+  const missing = ALL_DECADES.filter((d) => !decades.includes(d));
+
+  const save = async (d: number, form: HTMLFormElement) => {
+    const v = Object.fromEntries(new FormData(form)) as Record<string, string>;
+    setBusy(d);
+    const r = await fetch("/api/story", { method: "PUT", headers: { "x-admin-token": token, "Content-Type": "application/json" }, body: JSON.stringify({ decade: d, ...v }) }).catch(() => null);
+    setBusy(null);
+    if (r?.ok) {
+      setNotes((await r.json()).decades ?? notes);
+      onSaved("נשמר. זה מופיע עכשיו בסיפור החיים.");
+    } else onSaved("השמירה לא הצליחה. נסו שוב.");
+  };
+
+  const field = "w-full rounded-md border border-charcoal/20 bg-white px-3 py-2";
+  return (
+    <div className="mt-8 flex flex-col gap-6">
+      <p className="text-ink-soft">
+        התמונות נכנסות לכל עשור לבד, לפי השנה שבה צולמו. כאן אפשר (לא חובה) לתת לעשור כותרת ולכתוב עליו כמה מילים, בעברית וברוסית.
+        מה שלא נכתב ברוסית יוצג בעברית.
+      </p>
+      {decades.map((d) => {
+        const n = notes[String(d)] ?? {};
+        return (
+          <form
+            key={`${d}-${JSON.stringify(n)}`}
+            onSubmit={(e) => {
+              e.preventDefault();
+              save(d, e.currentTarget);
+            }}
+            className="flex flex-col gap-3 rounded-lg bg-white p-6 shadow-[var(--shadow-paper)]"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="font-display text-2xl text-burgundy">{decadeLabel(d, "he")}</span>
+              <span className="text-sm text-ink-soft">{counts.get(d) ?? 0} תמונות וסרטונים</span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-sm">
+                כותרת (עברית)
+                <input name="title" defaultValue={n.title ?? ""} maxLength={120} placeholder={`למשל: ${decadeLabel(d, "he")} בקייב`} className={field} />
+              </label>
+              <label className="flex flex-col gap-1 text-sm" dir="ltr">
+                <span dir="rtl">כותרת (רוסית)</span>
+                <input name="titleRu" defaultValue={n.titleRu ?? ""} maxLength={120} lang="ru" className={field} />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                כמה מילים (עברית)
+                <textarea name="text" defaultValue={n.text ?? ""} maxLength={2000} rows={4} className={field} />
+              </label>
+              <label className="flex flex-col gap-1 text-sm" dir="ltr">
+                <span dir="rtl">כמה מילים (רוסית)</span>
+                <textarea name="textRu" defaultValue={n.textRu ?? ""} maxLength={2000} rows={4} lang="ru" className={field} />
+              </label>
+            </div>
+            <button type="submit" disabled={busy === d} className="min-h-11 w-fit rounded-full bg-rose px-6 text-white hover:bg-burgundy disabled:opacity-50">
+              {busy === d ? "שומרים…" : "שמירה"}
+            </button>
+          </form>
+        );
+      })}
+      {missing.length > 0 && (
+        <label className="flex flex-wrap items-center gap-3 text-ink-soft">
+          הוספת עשור שעוד אין בו תמונות:
+          <select value="" onChange={(e) => e.target.value && setExtra((x) => [...x, Number(e.target.value)])} className="min-h-11 rounded-md border border-charcoal/20 bg-white px-3">
+            <option value="">בחרו</option>
+            {missing.map((d) => (
+              <option key={d} value={d}>
+                {decadeLabel(d, "he")}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+    </div>
+  );
+}
+
+type Removal = { m: StoredMemory; file?: StoredFile; req: NonNullable<StoredMemory["deleteRequest"]> };
 
 const REL: Record<string, string> = { child: "בן/בת של רוזה", grandchild: "נכד/ה של רוזה", great: "נין/נינה של רוזה", partner: "בן/בת זוג", sibling: "אח/אחות של רוזה", parent: "הורה של רוזה" };
 const fmtDate = (iso: string) => new Date(iso).toLocaleString("he-IL", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -155,8 +263,9 @@ function FilePreview({ collection, id, file, token, onPrints }: { collection: Ki
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [kind, setKind] = useState<Kind>("memories");
-  const [tab, setTab] = useState<Status>("pending");
+  const [section, setSection] = useState<Section>("removals");
+  const kind: Kind = section === "family" ? "family" : "memories";
+  const [tab, setTab] = useState<Status>("approved");
   const [data, setData] = useState<{ memories: StoredMemory[]; family: StoredPerson[] }>({ memories: [], family: [] });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -259,6 +368,26 @@ export default function AdminPage() {
     if (r.ok) load(token);
   };
 
+  const act = async (memoryId: string, body: object, msg: string) => {
+    setBusy(true);
+    const r = await fetch(`/api/memories/${memoryId}`, { method: "PATCH", headers: { "x-admin-token": token, "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    setBusy(false);
+    if (!r?.ok) {
+      setError("הפעולה לא הצליחה. נסו שוב.");
+      return;
+    }
+    setToast(msg);
+    setTimeout(() => setToast(""), 3200);
+    load(token);
+  };
+
+  const removals: Removal[] = data.memories
+    .filter((m) => m.status !== "rejected")
+    .flatMap((m) => [
+      ...(m.deleteRequest ? [{ m, req: m.deleteRequest }] : []),
+      ...m.files.filter((f) => f.deleteRequest).map((f) => ({ m, file: f, req: f.deleteRequest! })),
+    ]);
+
   const list = (kind === "memories" ? data.memories : data.family) as Item[];
   const count = (k: Kind, s: Status) => (k === "memories" ? data.memories : data.family).filter((x) => x.status === s).length;
   const shown = list.filter((x) => x.status === tab);
@@ -300,7 +429,7 @@ export default function AdminPage() {
         {!authed ? (
           <div className="mx-auto max-w-md rounded-lg bg-white p-8 shadow-[var(--shadow-paper)]">
             <h1 className="font-display text-3xl font-light text-burgundy">כניסה לניהול</h1>
-            <p className="mt-3 leading-relaxed text-ink-soft">כאן מאשרים זיכרונות, תמונות ואנשים שבני המשפחה שולחים, לפני שהם מופיעים באתר.</p>
+            <p className="mt-3 leading-relaxed text-ink-soft">כאן מטפלים בבקשות הסרה, מאשרים אנשים לעץ המשפחה וכותבים מילים לסיפור החיים.</p>
             <form
               className="mt-6 flex flex-col gap-3"
               onSubmit={(e) => {
@@ -322,32 +451,42 @@ export default function AdminPage() {
               <h1 className="font-display text-3xl font-light text-burgundy">שלום! כך זה עובד</h1>
               <ol className="mt-4 grid gap-3 text-[0.98rem] leading-relaxed text-charcoal sm:grid-cols-3">
                 <li className="rounded-md bg-blush/30 p-4">
-                  <b className="block text-burgundy">1. בני המשפחה שולחים</b>
-                  זיכרונות ותמונות דרך &quot;שתפו זיכרון&quot;, ואנשים דרך &quot;הוספה לעץ&quot; באתר.
+                  <b className="block text-burgundy">1. כל המשפחה מעלה</b>
+                  תמונות, סרטונים וזיכרונות מופיעים באתר מיד, בלי לחכות לכם, ומסתדרים לבד לפי השנים.
                 </li>
                 <li className="rounded-md bg-blush/30 p-4">
-                  <b className="block text-burgundy">2. זה מגיע לכאן</b>
-                  ללשונית &quot;ממתינים לאישור&quot;. שום דבר לא מופיע באתר לפני שאישרתם.
+                  <b className="block text-burgundy">2. רק אתם מוחקים</b>
+                  מי שרוצה שמשהו יוסר שולח בקשה. היא מגיעה ל&quot;בקשות הסרה&quot; ושום דבר לא נמחק בלעדיכם.
                 </li>
                 <li className="rounded-md bg-blush/30 p-4">
-                  <b className="block text-burgundy">3. אתם מחליטים</b>
-                  &quot;אישור&quot; מפרסם באתר. &quot;לא לפרסם&quot; מסתיר ומוחק את הקבצים.
+                  <b className="block text-burgundy">3. עץ המשפחה אצלכם</b>
+                  אנשים שמוסיפים את עצמם לעץ מופיעים רק אחרי שאישרתם ב&quot;עץ המשפחה&quot;.
                 </li>
               </ol>
             </section>
 
             <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex gap-2" role="group" aria-label="מה לנהל">
-                {(["memories", "family"] as Kind[]).map((k) => (
+              <div className="flex flex-wrap gap-2" role="group" aria-label="מה לנהל">
+                {(
+                  [
+                    ["removals", "בקשות הסרה", removals.length],
+                    ["memories", "כל התוכן", data.memories.filter((m) => m.status === "pending").length],
+                    ["family", "עץ המשפחה", count("family", "pending")],
+                    ["story", "סיפור החיים", 0],
+                  ] as [Section, string, number][]
+                ).map(([k, label, n]) => (
                   <button
                     key={k}
                     type="button"
-                    aria-pressed={kind === k}
-                    onClick={() => setKind(k)}
-                    className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-5", kind === k ? "bg-burgundy text-white" : "border border-charcoal/20 bg-white text-charcoal")}
+                    aria-pressed={section === k}
+                    onClick={() => {
+                      setSection(k);
+                      setTab(k === "family" && count("family", "pending") > 0 ? "pending" : "approved");
+                    }}
+                    className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-5", section === k ? "bg-burgundy text-white" : "border border-charcoal/20 bg-white text-charcoal")}
                   >
-                    {k === "memories" ? "זיכרונות ותמונות" : "עץ המשפחה"}
-                    {count(k, "pending") > 0 && <span className={cn("rounded-full px-2 text-[0.8rem]", kind === k ? "bg-white text-burgundy" : "bg-rose text-white")}>{count(k, "pending")}</span>}
+                    {label}
+                    {n > 0 && <span className={cn("rounded-full px-2 text-[0.8rem]", section === k ? "bg-white text-burgundy" : "bg-rose text-white")}>{n}</span>}
                   </button>
                 ))}
               </div>
@@ -357,8 +496,81 @@ export default function AdminPage() {
               </button>
             </div>
 
+            {error && <p role="alert" className="mt-4 text-burgundy">{error}</p>}
+
+            {section === "story" && (
+              <StoryEditor
+                token={token}
+                memories={data.memories}
+                onSaved={(msg) => {
+                  setToast(msg);
+                  setTimeout(() => setToast(""), 3200);
+                }}
+              />
+            )}
+
+            {section === "removals" &&
+              (removals.length === 0 ? (
+                <div className="mt-12 flex flex-col items-center gap-4 rounded-lg border border-dashed border-dusty/50 px-6 py-14 text-center">
+                  <RoseBud className="h-12 w-8" still />
+                  <p className="font-display text-xl text-charcoal">אין בקשות הסרה.</p>
+                  <p className="max-w-md text-ink-soft">כשמישהו במשפחה ילחץ &quot;בקשה להסרה&quot; על תמונה או זיכרון, זה יופיע כאן ותחליטו אם למחוק.</p>
+                </div>
+              ) : (
+                <ul className="mt-8 flex flex-col gap-6">
+                  {removals.map(({ m, file, req }) => (
+                    <li key={`${m.id}-${file?.name ?? ""}`} className="rounded-lg bg-white p-6 shadow-[var(--shadow-paper)]">
+                      <div className="mb-4 flex items-start gap-3 rounded-md bg-[#f6ead2] p-4 text-[#6b4a12]">
+                        <Flag className="mt-1 h-4 w-4 shrink-0" aria-hidden />
+                        <div className="flex flex-col gap-1">
+                          <b>
+                            {file ? "בקשה להסיר תמונה" : "בקשה להסיר זיכרון"}
+                            {req.by ? ` · מאת ${req.by}` : ""}
+                          </b>
+                          {req.reason ? <span dir="auto">&quot;{req.reason}&quot;</span> : <span>לא נכתבה סיבה.</span>}
+                          <span className="text-sm opacity-80">{fmtDate(req.at)}</span>
+                        </div>
+                      </div>
+                      <span className="text-sm text-ink-soft">
+                        הועלה על ידי {m.author} · {fmtDate(m.createdAt)}
+                      </span>
+                      {!file && m.body && <p className="mt-2 whitespace-pre-wrap font-display text-lg leading-relaxed text-charcoal/90" dir="auto">{m.body}</p>}
+                      {(file ? [file] : m.files).length > 0 && (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          {(file ? [file] : m.files).map((f) => (
+                            <FilePreview key={f.name} collection="memories" id={m.id} file={f} token={token} />
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-5 flex flex-wrap gap-3 border-t border-line pt-4">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => (file ? act(m.id, { removeFile: file.name }, "התמונה נמחקה מהאתר.") : act(m.id, { status: "rejected" }, "הזיכרון הוסר מהאתר."))}
+                          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-burgundy px-6 text-white disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden />
+                          {file ? "למחוק את התמונה" : "להסיר את הזיכרון"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => (file ? act(m.id, { files: [{ name: file.name, keep: true }] }, "נשאר באתר.") : act(m.id, { keep: true }, "נשאר באתר."))}
+                          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-charcoal/20 px-5 text-charcoal hover:bg-ivory disabled:opacity-50"
+                        >
+                          <Check className="h-4 w-4" aria-hidden />
+                          להשאיר באתר
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ))}
+
+            {(section === "memories" || section === "family") && (
+            <>
             <div role="tablist" className="mt-6 flex gap-1 overflow-x-auto border-b border-line">
-              {TABS.map((tb) => (
+              {TABS.filter((tb) => kind === "family" || tb.id !== "pending" || count("memories", "pending") > 0).map((tb) => (
                 <button
                   key={tb.id}
                   role="tab"
@@ -371,20 +583,18 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {error && <p role="alert" className="mt-4 text-burgundy">{error}</p>}
-
             {shown.length === 0 && (
               <div className="mt-12 flex flex-col items-center gap-4 rounded-lg border border-dashed border-dusty/50 px-6 py-14 text-center">
                 <RoseBud className="h-12 w-8" still />
                 <p className="font-display text-xl text-charcoal">{TABS.find((x) => x.id === tab)!.empty}</p>
                 {tab === "pending" && (
                   <p className="max-w-md text-ink-soft">
-                    רוצים לנסות? פתחו את האתר, שלחו זיכרון לבדיקה (עם תמונה), ולחצו כאן &quot;רענון&quot;.
+                    רוצים לנסות? פתחו את האתר, הוסיפו את עצמכם לעץ, ולחצו כאן &quot;רענון&quot;.
                   </p>
                 )}
                 {tab === "pending" && (
                   <a href={kind === "memories" ? "/share" : "/#family"} target="_blank" className="inline-flex min-h-11 items-center gap-2 rounded-full bg-rose px-6 text-white hover:bg-burgundy">
-                    {kind === "memories" ? "שליחת זיכרון לבדיקה" : "הוספת אדם לעץ"}
+                    {kind === "memories" ? "שיתוף זיכרון" : "הוספת אדם לעץ"}
                   </a>
                 )}
               </div>
@@ -447,6 +657,17 @@ export default function AdminPage() {
                                 );
                               })()}
                               <FilePreview collection={kind} id={item.id} file={f} token={token} onPrints={kind === "memories" ? (p) => savePrints(item.id, f.name, p) : undefined} />
+                              {kind === "memories" && item.status !== "rejected" && (
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => window.confirm("למחוק את הקובץ הזה מהאתר? אי אפשר לבטל.") && act(item.id, { removeFile: f.name }, "הקובץ נמחק.")}
+                                  className="mt-2 inline-flex min-h-9 items-center gap-1.5 text-sm text-ink-soft hover:text-burgundy disabled:opacity-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                                  מחיקת הקובץ
+                                </button>
+                              )}
                               {kind === "memories" && (
                                 <FileMeta
                                   key={`${f.name}-${f.date?.year ?? ""}-${f.date?.source ?? ""}-${f.category ?? ""}`}
@@ -491,6 +712,8 @@ export default function AdminPage() {
                 })}
               </AnimatePresence>
             </ul>
+            </>
+            )}
           </>
         )}
       </main>

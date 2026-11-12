@@ -6,7 +6,15 @@
   keeps the gallery fast and is what the date-estimating model looks at.
 */
 
-export type Prepared = { date?: string; width?: number; height?: number; thumb?: Blob; sha?: string; phash?: string };
+export type Prepared = { date?: string; nameDate?: string; width?: number; height?: number; thumb?: Blob; sha?: string; phash?: string };
+
+/** a date in the file name: IMG_20120514_..., IMG-20120514-WA0001, 2012-05-14 ..., PXL_20120514... */
+export function dateFromName(name: string): string | undefined {
+  const m = name.match(/(?<!\d)((?:19|20)\d{2})[-_.]?(0[1-9]|1[0-2])[-_.]?(0[1-9]|[12]\d|3[01])(?!\d)/);
+  if (!m) return undefined;
+  const y = Number(m[1]);
+  return y >= 1990 && y <= new Date().getFullYear() ? `${m[1]}-${m[2]}-${m[3]}` : undefined;
+}
 
 const THUMB_EDGE = 720;
 
@@ -156,15 +164,16 @@ async function videoThumb(file: File) {
 
 export async function prepare(file: File): Promise<Prepared> {
   const sha = await sha256(file).catch(() => undefined);
+  const nameDate = dateFromName(file.name);
   if (file.type.startsWith("image/")) {
     const [date, t] = await Promise.all([exifDate(file).catch(() => undefined), imageThumb(file)]);
-    return { date, sha, ...t };
+    return { date, nameDate, sha, ...t };
   }
   if (file.type.startsWith("video/")) {
     const [date, t] = await Promise.all([videoDate(file).catch(() => undefined), videoThumb(file)]);
-    return { date, sha, ...t };
+    return { date, nameDate, sha, ...t };
   }
-  return { sha };
+  return { sha, nameDate };
 }
 
 /** A small JPEG from an already-loaded image (used by the moderation page for older uploads). */

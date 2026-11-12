@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { family as seed } from "@/content/family";
-import { photos as seedPhotos } from "@/content";
 import { FamilyGraph, expandRequest, mergePeople, type FamilyRequest, type TreePerson } from "@/lib/family";
 import { useLang } from "@/lib/i18n";
 import { STATIC } from "../Transition";
@@ -60,8 +59,7 @@ export function useFamily() {
     return new FamilyGraph(mergePeople(mergePeople(seed, approved), mine));
   }, [approved, local]);
 
-  // the family's own photos once there are any; until then the placeholder frames
-  const photos = useMemo(() => (real.length ? real : seedPhotos), [real]);
+  const photos = real;
 
   const relLabel = useCallback(
     (id: string) => {

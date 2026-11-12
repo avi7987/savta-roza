@@ -3,11 +3,13 @@
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Mic, Video } from "lucide-react";
-import { memories as seeded, photoById } from "@/content";
+import { photoById } from "@/content";
 import type { Memory } from "@/content/types";
 import { useLang } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
 import ArchivalImage from "../ArchivalImage";
+import AudioPlayer from "../AudioPlayer";
+import { RemovalRequest } from "../PhotoActions";
 import { STATIC, TLink } from "../Transition";
 import { Container, SectionIntro, buttonClass, cn } from "../ui";
 
@@ -58,7 +60,11 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
         {body}
       </p>
 
-      {m.mediaKind && (
+      {m.mediaKind === "audio" && m.mediaSrc && <AudioPlayer src={m.mediaSrc} title={m.title || m.author} className="mt-5" />}
+      {m.mediaKind === "video" && m.mediaSrc && (
+        <video src={m.mediaSrc} controls playsInline preload="metadata" className="mt-5 w-full rounded-[var(--radius-photo)] bg-black" />
+      )}
+      {m.mediaKind && !m.mediaSrc && (
         <span className="mt-4 inline-flex items-center gap-2 text-[0.85rem] text-sage-deep">
           {m.mediaKind === "audio" ? <Mic className="h-4 w-4" strokeWidth={1.4} aria-hidden /> : <Video className="h-4 w-4" strokeWidth={1.4} aria-hidden />}
           {m.mediaKind === "audio" ? t.memories.audio : t.memories.video}
@@ -74,6 +80,7 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
             <time dateTime={m.createdAt}>{dateFmt(m.createdAt, lang)}</time>
           </span>
         </span>
+        {!m.placeholder && <RemovalRequest memoryId={m.id} requested={m.removalRequested} />}
         {foreign && (
           <button type="button" onClick={() => setOriginal((o) => !o)} className="min-h-11 text-[0.82rem] text-burgundy underline decoration-dusty/50 underline-offset-4">
             {original ? t.memories.showTranslation : t.memories.original}
@@ -86,28 +93,36 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
 
 export default function Memories() {
   const { t } = useLang();
-  const [approved, setApproved] = useState<Memory[]>([]);
+  const [list, setList] = useState<Memory[] | null>(null);
 
   useEffect(() => {
     if (STATIC) return;
     fetch("/api/memories")
       .then((r) => (r.ok ? r.json() : { memories: [] }))
-      .then((d: { memories: Memory[] }) => setApproved(d.memories ?? []))
-      .catch(() => {});
+      // photos alone already live in the life story; here go words and recordings
+      .then((d: { memories: Memory[] }) => setList((d.memories ?? []).filter((m) => m.body?.trim() || m.mediaKind === "audio")))
+      .catch(() => setList([]));
   }, []);
 
-  // real, approved memories come first; examples remain only until the book has its own pages
-  const list = approved.length ? approved : seeded;
 
   return (
     <section id="memories" aria-labelledby="memories-title" className="py-[var(--spacing-section)]">
       <Container>
         <SectionIntro id="memories-title" eyebrow={t.memories.eyebrow} title={t.memories.title} lead={t.memories.lead} layout="center" />
-        <div className="mt-16 columns-1 gap-8 md:columns-2 lg:columns-3">
-          {list.map((m, i) => (
-            <MemoryCard key={m.id} m={m} index={i} />
-          ))}
-        </div>
+        {list && list.length > 0 ? (
+          <div className="mt-16 columns-1 gap-8 md:columns-2 lg:columns-3">
+            {list.map((m, i) => (
+              <MemoryCard key={m.id} m={m} index={i} />
+            ))}
+          </div>
+        ) : list ? (
+          <div className="mx-auto mt-14 max-w-xl rounded-[var(--radius-card)] border border-dashed border-dusty/50 bg-white/60 p-8 text-center">
+            <p className="font-display text-2xl text-burgundy">{t.memories.empty}</p>
+            <p className="mt-3 text-ink-soft">{t.memories.emptyLead}</p>
+          </div>
+        ) : (
+          <div className="mt-16 h-40" aria-hidden />
+        )}
         <div className="mt-8 flex justify-center">
           <TLink href="/share" className={buttonClass.secondary}>
             {t.memories.cta}

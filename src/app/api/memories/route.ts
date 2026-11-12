@@ -30,10 +30,17 @@ export const runtime = "nodejs";
 const clean = (v: FormDataEntryValue | null, max: number) =>
   typeof v === "string" ? v.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, max) : "";
 
-/** Public shape of an approved memory: no moderation data, files via the guarded file route. */
+/** A single year mentioned in the memory's own words ("בשנת 1975", "в 1975 году"), if exactly one is. */
+function yearInText(text: string) {
+  const years = Array.from(new Set((text.match(/(?<!\d)(18[89]\d|19\d\d|20[0-2]\d)(?!\d)/g) ?? []).map(Number)));
+  return years.length === 1 ? years[0] : undefined;
+}
+
+/** Public shape of a memory: no moderation data, files via the guarded file route. */
 const publicShape = (m: StoredMemory) => {
   const image = m.files.find((f) => f.kind === "image");
   const media = m.files.find((f) => f.kind !== "image");
+  const url = (n: string) => `/api/files/memories/${m.id}/${n}`;
   return {
     id: m.id,
     author: m.author,
@@ -42,15 +49,19 @@ const publicShape = (m: StoredMemory) => {
     body: m.body,
     lang: m.lang,
     createdAt: m.createdAt,
-    photoSrc: image ? `/api/files/memories/${m.id}/${image.name}` : undefined,
+    photoSrc: image ? url(image.thumb ?? image.name) : undefined,
+    photoFull: image ? url(image.name) : undefined,
     people: m.people,
     mediaKind: media?.kind,
+    mediaSrc: media ? url(media.name) : undefined,
+    removalRequested: !!m.deleteRequest,
   };
 };
 
 export async function GET() {
-  const approved = await store.list("approved");
-  return NextResponse.json({ memories: approved.map(publicShape) }, { headers: { "Cache-Control": "public, max-age=60" } });
+  // everything shared is public right away, until the owner removes it
+  const visible = (await store.list()).filter((m) => m.status !== "rejected");
+  return NextResponse.json({ memories: visible.map(publicShape) }, { headers: { "Cache-Control": "no-cache" } });
 }
 
 export async function POST(req: Request) {
@@ -84,7 +95,7 @@ export async function POST(req: Request) {
   const userDate = whenFromForm(clean(form.get("when"), 200));
   const cat = clean(form.get("category"), 20) as CategoryId;
   const category = CATEGORIES.includes(cat) ? cat : undefined;
-  let meta: { date?: string; width?: number; height?: number; sha?: string; phash?: string }[] = [];
+  let meta: { date?: string; nameDate?: string; width?: number; height?: number; sha?: string; phash?: string }[] = [];
   try {
     meta = JSON.parse(clean(form.get("filesMeta"), 4000) || "[]");
   } catch {}
@@ -110,7 +121,9 @@ export async function POST(req: Request) {
     }
     const m = meta[i] ?? {};
     const dim = (n: unknown) => (Number.isFinite(Number(n)) && Number(n) > 0 && Number(n) < 20000 ? Math.round(Number(n)) : undefined);
-    const exif = cleanDate({ date: m.date }, "exif");
+    // the file's own date, else the date in its name (e.g. IMG-20120514-WA0001), else a year the memory mentions
+    const textYear = yearInText(`${title ?? ""} ${body}`);
+    const exif = cleanDate({ date: m.date }, "exif") ?? cleanDate({ date: m.nameDate }, "exif") ?? (textYear ? cleanDate({ year: textYear }, "user") : undefined);
     files.push({ data, ext: found.ext, kind: found.kind, thumb, sha: isSha(m.sha) ? m.sha : undefined, phash: isPhash(m.phash) ? m.phash : undefined, width: dim(m.width), height: dim(m.height), date: found.kind === "audio" ? userDate : (userDate ?? exif), category: found.kind === "audio" ? undefined : category });
   }
 
@@ -135,7 +148,8 @@ export async function POST(req: Request) {
   // storage stays inside the free tier: past the cap, files are refused (text still is welcome)
   if (!(await canStore(files.reduce((s, f) => s + f.data.byteLength, 0)))) return NextResponse.json({ error: "full" }, { status: 507 });
 
-  const saved = await store.create({ author, relation, title, body, people: people.length ? people : undefined, lang: detectLang(`${title ?? ""} ${body}`) }, files);
+  // shared memories appear on the site straight away; only the owner can remove them
+  const saved = await store.create({ author, relation, title, body, people: people.length ? people : undefined, lang: detectLang(`${title ?? ""} ${body}`) }, files, "approved");
   if (files.length) await afterStore();
   // estimate dates for undated photos (and check "dated" scans) after answering the visitor
   if (files.some((f) => f.kind !== "audio" && f.date?.source !== "user")) await later(analyzeMemory(saved.id));

@@ -14,7 +14,7 @@ export function cloudStore<T extends Base>(collection: string, db: D1Like, files
   const parse = (r: Row | null) => (r ? (JSON.parse(r.data) as T) : undefined);
 
   return {
-    async create(fields, uploads: NewFile[]) {
+    async create(fields, uploads: NewFile[], status = "pending") {
       const id = crypto.randomUUID();
       const stored: StoredFile[] = [];
       for (const f of uploads) {
@@ -28,7 +28,7 @@ export function cloudStore<T extends Base>(collection: string, db: D1Like, files
         }
         stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category, sha: f.sha, phash: f.phash });
       }
-      const record = { ...fields, id, status: "pending", createdAt: new Date().toISOString(), files: stored } as T;
+      const record = { ...fields, id, status, createdAt: new Date().toISOString(), files: stored } as T;
       await db
         .prepare("INSERT INTO records (collection, id, status, created_at, data) VALUES (?1, ?2, ?3, ?4, ?5)")
         .bind(collection, id, record.status, record.createdAt, JSON.stringify(record))
@@ -63,6 +63,15 @@ export function cloudStore<T extends Base>(collection: string, db: D1Like, files
       const name = `${crypto.randomUUID()}.${ext}`;
       await files.put(key(id, name), data, { httpMetadata: { contentType: TYPES[ext] } });
       return name;
+    },
+    async removeFile(id, name) {
+      const cur = await this.get(id);
+      const f = cur?.files.find((x) => x.name === name);
+      if (!cur || !f) return 0;
+      await files.delete([key(id, f.name), ...(f.thumb ? [key(id, f.thumb)] : [])]);
+      const next = { ...cur, files: cur.files.filter((x) => x.name !== name) };
+      await db.prepare("UPDATE records SET data = ?1 WHERE collection = ?2 AND id = ?3").bind(JSON.stringify(next), collection, id).run();
+      return f.size + (f.thumbSize ?? 0);
     },
     async removeFiles(id) {
       const cur = await this.get(id);

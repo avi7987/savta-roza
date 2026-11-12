@@ -36,6 +36,9 @@ export type Photo = {
   kind?: "image" | "video";
   when?: PhotoDate;
   memoryId?: string;
+  /** stored file name within the memory (for dating and removal requests) */
+  file?: string;
+  removalRequested?: boolean;
   placeholder?: boolean;
 };
 
@@ -92,6 +95,8 @@ export type Memory = {
   photoId?: string;
   photoSrc?: string;
   mediaKind?: "video" | "audio";
+  mediaSrc?: string;
+  removalRequested?: boolean;
   createdAt: string;
   placeholder?: boolean;
 };

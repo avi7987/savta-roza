@@ -33,7 +33,7 @@ const approvedTree = () => treeOf(["approved"]);
 
 export async function GET() {
   const { people } = await approvedTree();
-  return NextResponse.json({ people }, { headers: { "Cache-Control": "public, max-age=60" } });
+  return NextResponse.json({ people }, { headers: { "Cache-Control": "no-cache" } });
 }
 
 export async function POST(req: Request) {

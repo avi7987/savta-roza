@@ -36,7 +36,7 @@ export function fileStore<T extends Base>(collection: string): Store<T> {
   };
 
   return {
-    create: (fields, files) =>
+    create: (fields, files, status = "pending") =>
       locked(async () => {
         const id = randomUUID();
         const dir = path.join(uploads, id);
@@ -53,7 +53,7 @@ export function fileStore<T extends Base>(collection: string): Store<T> {
           }
           stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category, sha: f.sha, phash: f.phash });
         }
-        const record = { ...fields, id, status: "pending", createdAt: new Date().toISOString(), files: stored } as T;
+        const record = { ...fields, id, status, createdAt: new Date().toISOString(), files: stored } as T;
         const all = await read();
         all.push(record);
         await write(all);
@@ -87,6 +87,17 @@ export function fileStore<T extends Base>(collection: string): Store<T> {
       await writeFile(path.join(dir, name), data);
       return name;
     },
+    removeFile: (id, name) =>
+      locked(async () => {
+        const all = await read();
+        const m = all.find((x) => x.id === id);
+        const f = m?.files.find((x) => x.name === name);
+        if (!m || !f) return 0;
+        for (const n of [f.name, f.thumb]) if (n) await rm(path.join(uploads, id, n), { force: true });
+        m.files = m.files.filter((x) => x.name !== name);
+        await write(all);
+        return f.size + (f.thumbSize ?? 0);
+      }),
     removeFiles: (id) =>
       locked(async () => {
         const all = await read();

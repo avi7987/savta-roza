@@ -19,6 +19,8 @@ type ApiPhoto = {
   contributor: string;
   caption?: string;
   memoryId: string;
+  file: string;
+  removalRequested?: boolean;
 };
 
 const ALT = { he: "תמונה מהאלבום המשפחתי", ru: "Фотография из семейного альбома" };
@@ -26,6 +28,14 @@ const VIDEO_ALT = { he: "סרטון מהאלבום המשפחתי", ru: "Вид�
 
 let cache: Photo[] | null = null;
 let pending: Promise<Photo[]> | null = null;
+const listeners = new Set<(p: Photo[]) => void>();
+
+/** after a change (a date was added, a removal asked for), fetch again and update every view */
+export function refreshPhotos() {
+  cache = null;
+  pending = null;
+  load().then((p) => listeners.forEach((fn) => fn(p)));
+}
 
 function load(): Promise<Photo[]> {
   if (cache) return Promise.resolve(cache);
@@ -47,6 +57,8 @@ function load(): Promise<Photo[]> {
         people: p.people,
         contributor: p.contributor,
         memoryId: p.memoryId,
+        file: p.file,
+        removalRequested: p.removalRequested,
       })))
     )
     .catch(() => (cache = []));
@@ -59,6 +71,8 @@ export function usePhotos() {
   const [loaded, setLoaded] = useState(!!cache);
   useEffect(() => {
     let alive = true;
+    const fn = (p: Photo[]) => alive && setPhotos(p);
+    listeners.add(fn);
     load().then((p) => {
       if (alive) {
         setPhotos(p);
@@ -67,6 +81,7 @@ export function usePhotos() {
     });
     return () => {
       alive = false;
+      listeners.delete(fn);
     };
   }, []);
   return { photos, loaded };
