@@ -6,6 +6,20 @@ import { createContext, useContext, useEffect, useRef, useState, type AnchorHTML
 
 type SiteCtx = { go: (href: string) => void; ready: boolean; setReady: (b: boolean) => void };
 
+/** In the single-file preview build there is no server routing, so the upload screen lives at #upload. */
+export const STATIC = process.env.NEXT_PUBLIC_STATIC === "1";
+
+export function useHashView() {
+  const [view, setView] = useState<string>("");
+  useEffect(() => {
+    const read = () => setView(window.location.hash.replace("#", ""));
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, []);
+  return view;
+}
+
 const Ctx = createContext<SiteCtx>({ go: () => {}, ready: true, setReady: () => {} });
 
 export const useSite = () => useContext(Ctx);
@@ -30,10 +44,23 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   const go = (href: string) => {
-    if (href === pathname) return;
+    if (!STATIC && href === pathname) return;
     target.current = href;
-    router.prefetch(href);
+    if (!STATIC) router.prefetch(href);
     setCovering(true);
+  };
+
+  const arrive = (href: string) => {
+    if (!STATIC) {
+      router.push(href);
+      return;
+    }
+    if (href === "/upload") window.location.hash = "upload";
+    else history.replaceState(null, "", window.location.pathname + window.location.search);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    const lenis = (window as unknown as { __lenis?: { scrollTo: (n: number, o: object) => void } }).__lenis;
+    if (href === "/") lenis?.scrollTo(0, { immediate: true, force: true });
+    setTimeout(() => setCovering(false), 200);
   };
 
   return (
@@ -51,8 +78,9 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
             transition={{ duration: 0.75, ease: [0.76, 0, 0.24, 1] }}
             onAnimationComplete={() => {
               if (target.current) {
-                router.push(target.current);
+                const href = target.current;
                 target.current = null;
+                arrive(href);
               }
             }}
           >

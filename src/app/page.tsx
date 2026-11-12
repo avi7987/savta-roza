@@ -6,6 +6,7 @@ import Album from "@/components/Album";
 import VideoInsight from "@/components/VideoInsight";
 import HelpSwipe from "@/components/HelpSwipe";
 import { Footer } from "@/components/Shell";
+import StaticUpload from "@/components/StaticUpload";
 
 export default function Home() {
   return (
@@ -21,6 +22,7 @@ export default function Home() {
         <HelpSwipe />
       </main>
       <Footer />
+      <StaticUpload />
     </>
   );
 }
