@@ -9,10 +9,16 @@ import { ease } from "@/lib/motion";
 import { RoseTop } from "./Botanical";
 import { STATIC } from "./Transition";
 import { buttonClass, cn } from "./ui";
+import { prepare, type Prepared } from "@/lib/mediaPrep";
+import { decadeLabel, formatDate } from "@/lib/photoDate";
+import type { CategoryId } from "@/content/types";
 import { useFamily } from "./family/useFamily";
 import PersonAvatar from "./family/PersonAvatar";
 
-type Picked = { file: File; url?: string; kind: "image" | "video" | "audio" };
+type Picked = { file: File; url?: string; kind: "image" | "video" | "audio"; prep?: Prepared; preparing?: boolean };
+type WhenMode = "unknown" | "date" | "year" | "decade";
+const DECADES = [1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
+const CATS: CategoryId[] = ["family", "childhood", "celebrations", "travel", "moments", "grandchildren"];
 
 function Field({ label, optional, error, hint, children, id }: { label: string; optional?: string; error?: string; hint?: string; children: React.ReactNode; id: string }) {
   return (
@@ -46,6 +52,8 @@ export default function MemorySubmissionForm() {
   const [state, setState] = useState<"idle" | "sending" | "done" | "error" | "full">("idle");
   const [over, setOver] = useState(false);
   const [tagged, setTagged] = useState<string[]>([]);
+  const [when, setWhen] = useState<{ mode: WhenMode; date: string; year: string; decade?: number }>({ mode: "unknown", date: "", year: "" });
+  const [category, setCategory] = useState<CategoryId | "">("");
   const fam = useFamily();
   const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
   const tagOptions = fam.graph.people.filter((p) => !p.placeholder).sort((a, b) => (fam.graph.ring(a.id) ?? 9) - (fam.graph.ring(b.id) ?? 9));
@@ -61,12 +69,21 @@ export default function MemorySubmissionForm() {
       else if (file.size > maxBytes(kind)) problems.push(s.errors.size(file.name));
       else next.push({ file, kind, url: kind === "image" ? URL.createObjectURL(file) : undefined });
     }
+    next.forEach((p) => (p.preparing = p.kind !== "audio"));
     setFiles((cur) => {
       const merged = [...cur, ...next];
       if (merged.length > LIMITS.maxFiles) problems.push(s.errors.count);
       return merged.slice(0, LIMITS.maxFiles);
     });
     setErrors((e) => ({ ...e, files: problems.join(" · ") }));
+    // read each file's own date and make its small preview, in the browser
+    next
+      .filter((p) => p.kind !== "audio")
+      .forEach((p) =>
+        prepare(p.file)
+          .catch(() => ({}))
+          .then((prep) => setFiles((cur) => cur.map((x) => (x.file === p.file ? { ...x, prep, preparing: false } : x))))
+      );
   };
 
   const validate = () => {
@@ -91,7 +108,13 @@ export default function MemorySubmissionForm() {
     }
     const fd = new FormData(ev.currentTarget);
     fd.delete("files");
-    files.forEach((f) => fd.append("files", f.file));
+    files.forEach((f, i) => {
+      fd.append("files", f.file);
+      if (f.prep?.thumb) fd.append(`thumb-${i}`, f.prep.thumb, "thumb.jpg");
+    });
+    fd.set("filesMeta", JSON.stringify(files.map((f) => ({ date: f.prep?.date, width: f.prep?.width, height: f.prep?.height }))));
+    fd.set("when", JSON.stringify({ mode: when.mode, date: when.date, year: Number(when.year) || undefined, decade: when.decade }));
+    if (category) fd.set("category", category);
     try {
       const res = await fetch("/api/memories", { method: "POST", body: fd });
       if (res.status === 507) {
@@ -109,6 +132,8 @@ export default function MemorySubmissionForm() {
     setValues({ name: "", relation: "", title: "", memory: "" });
     setFiles([]);
     setTagged([]);
+    setWhen({ mode: "unknown", date: "", year: "" });
+    setCategory("");
     setErrors({});
     setState("idle");
   };
@@ -217,6 +242,11 @@ export default function MemorySubmissionForm() {
                         <span className="line-clamp-2 break-all">{f.file.name}</span>
                       </span>
                     )}
+                    {f.kind !== "audio" && (
+                      <span className="absolute inset-x-1 bottom-1 truncate rounded bg-white/90 px-1.5 py-0.5 text-center text-[0.68rem] text-charcoal">
+                        {f.preparing ? "…" : f.prep?.date ? `${formatDate({ source: "exif", date: f.prep.date }, lang)} · ${s.fromFile}` : s.noDate}
+                      </span>
+                    )}
                     <button
                       type="button"
                       onClick={() => setFiles((all) => all.filter((_, j) => j !== i))}
@@ -230,6 +260,53 @@ export default function MemorySubmissionForm() {
               </ul>
             )}
           </Field>
+
+          {files.some((f) => f.kind !== "audio") && (
+            <fieldset className="flex flex-col gap-3 rounded-[var(--radius-card)] bg-white/70 p-5 ring-1 ring-charcoal/[0.06]">
+              <legend className="sr-only">{s.whenQ}</legend>
+              <span aria-hidden className="text-[0.98rem] text-charcoal">{s.whenQ}</span>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={s.whenQ}>
+                {(["unknown", "date", "year", "decade"] as WhenMode[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={when.mode === m}
+                    onClick={() => setWhen((w) => ({ ...w, mode: m }))}
+                    className={cn("min-h-11 rounded-full border px-4 text-[0.92rem] transition-colors", when.mode === m ? "border-burgundy bg-burgundy text-white" : "border-charcoal/15 bg-white text-charcoal hover:border-burgundy/40")}
+                  >
+                    {s.whenModes[m]}
+                  </button>
+                ))}
+              </div>
+              {when.mode === "unknown" && <p className="text-[0.85rem] leading-relaxed text-ink-soft">{s.whenUnknownHint}</p>}
+              {when.mode === "date" && (
+                <input type="date" aria-label={s.whenModes.date} value={when.date} min="1880-01-01" max={new Date().toISOString().slice(0, 10)} onChange={(e) => setWhen((w) => ({ ...w, date: e.target.value }))} className={cn(input, "max-w-xs")} />
+              )}
+              {when.mode === "year" && (
+                <input type="number" inputMode="numeric" aria-label={s.whenModes.year} placeholder={s.yearPh} min={1880} max={new Date().getFullYear()} value={when.year} onChange={(e) => setWhen((w) => ({ ...w, year: e.target.value }))} className={cn(input, "max-w-[12rem]")} />
+              )}
+              {when.mode === "decade" && (
+                <div className="flex flex-wrap gap-2">
+                  {DECADES.map((d) => (
+                    <button key={d} type="button" aria-pressed={when.decade === d} onClick={() => setWhen((w) => ({ ...w, decade: d }))} className={cn("min-h-10 rounded-full border px-3 text-[0.88rem]", when.decade === d ? "border-burgundy bg-blush/60 text-burgundy" : "border-charcoal/15 bg-white text-charcoal")}>
+                      {decadeLabel(d, lang)}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <span className="mt-3 text-[0.98rem] text-charcoal">{s.categoryQ}</span>
+              <div className="flex flex-wrap gap-2" role="group" aria-label={s.categoryQ}>
+                {CATS.map((c) => (
+                  <button key={c} type="button" aria-pressed={category === c} onClick={() => setCategory(category === c ? "" : c)} className={cn("min-h-10 rounded-full border px-3 text-[0.88rem]", category === c ? "border-burgundy bg-blush/60 text-burgundy" : "border-charcoal/15 bg-white text-charcoal")}>
+                    {t.gallery.categories[c]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[0.82rem] text-ink-soft">{s.categoryHint}</p>
+            </fieldset>
+          )}
 
           {files.some((f) => f.kind !== "audio") && tagOptions.length > 0 && (
             <fieldset className="flex flex-col gap-3">
@@ -274,8 +351,8 @@ export default function MemorySubmissionForm() {
           )}
 
           <div>
-            <button type="submit" disabled={state === "sending"} className={cn(buttonClass.primary, "w-full sm:w-auto disabled:opacity-60")}>
-              {state === "sending" ? s.sending : s.submit}
+            <button type="submit" disabled={state === "sending" || files.some((f) => f.preparing)} className={cn(buttonClass.primary, "w-full sm:w-auto disabled:opacity-60")}>
+              {files.some((f) => f.preparing) ? s.preparing : state === "sending" ? s.sending : s.submit}
             </button>
           </div>
         </motion.form>

@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { family as seed } from "@/content/family";
 import { photos as seedPhotos } from "@/content";
-import type { Photo } from "@/content/types";
 import { FamilyGraph, expandRequest, mergePeople, type FamilyRequest, type TreePerson } from "@/lib/family";
 import { useLang } from "@/lib/i18n";
 import { STATIC } from "../Transition";
+import { usePhotos } from "../gallery/usePhotos";
 
 const LOCAL_KEY = "roza-family-local";
 type LocalEntry = { id: string; req: FamilyRequest; at: string };
@@ -19,9 +19,6 @@ const readLocal = (): LocalEntry[] => {
   }
 };
 
-/** Tagged photos uploaded with approved memories join the album photos. */
-type ApprovedMemory = { id: string; photoSrc?: string; people?: string[]; author: string };
-
 /*
   The tree a visitor sees = the seed + approved additions from the server
   + what this visitor added themselves (shown as "waiting for approval"; in the
@@ -31,7 +28,7 @@ export function useFamily() {
   const { lang, t } = useLang();
   const [approved, setApproved] = useState<TreePerson[]>([]);
   const [local, setLocal] = useState<LocalEntry[]>([]);
-  const [memoryPhotos, setMemoryPhotos] = useState<Photo[]>([]);
+  const { photos: real } = usePhotos();
 
   useEffect(() => {
     setLocal(readLocal());
@@ -41,16 +38,6 @@ export function useFamily() {
       fetch("/api/family")
         .then((r) => (r.ok ? r.json() : { people: [] }))
         .then((d) => setApproved(d.people ?? []))
-        .catch(() => {});
-      fetch("/api/memories")
-        .then((r) => (r.ok ? r.json() : { memories: [] }))
-        .then((d: { memories: ApprovedMemory[] }) =>
-          setMemoryPhotos(
-            (d.memories ?? [])
-              .filter((m) => m.photoSrc && m.people?.length)
-              .map((m) => ({ id: `mem-${m.id}`, src: m.photoSrc, full: m.photoSrc, ratio: 4 / 3, people: m.people, contributor: m.author, alt: { he: "תמונה מזיכרון", ru: "Фото из воспоминания" } }))
-          )
-        )
         .catch(() => {});
     }
     return () => window.removeEventListener("storage", sync);
@@ -73,7 +60,8 @@ export function useFamily() {
     return new FamilyGraph(mergePeople(mergePeople(seed, approved), mine));
   }, [approved, local]);
 
-  const photos = useMemo(() => [...seedPhotos, ...memoryPhotos], [memoryPhotos]);
+  // the family's own photos once there are any; until then the placeholder frames
+  const photos = useMemo(() => (real.length ? real : seedPhotos), [real]);
 
   const relLabel = useCallback(
     (id: string) => {

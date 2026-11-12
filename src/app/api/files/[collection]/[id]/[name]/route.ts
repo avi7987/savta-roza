@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ collecti
   const s = STORES[collection as keyof typeof STORES];
   if (!s) return new Response("Not found", { status: 404 });
   const record = await s.get(id);
-  if (!record || !record.files.some((f) => f.name === name)) return new Response("Not found", { status: 404 });
+  if (!record || !record.files.some((f) => f.name === name || f.thumb === name)) return new Response("Not found", { status: 404 });
   if (record.status !== "approved" && !(await isAdmin(req))) return new Response("Not found", { status: 404 });
   const data = await s.readFile(id, name);
   if (!data) return new Response("Not found", { status: 404 });

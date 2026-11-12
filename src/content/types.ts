@@ -3,6 +3,8 @@
  * `placeholder: true` marks structure waiting for real family content; the UI labels it as such
  * and never presents it as history.
  */
+import type { PhotoDate } from "@/lib/photoDate";
+
 export type Lang = "he" | "ru";
 export type Localized = Record<Lang, string>;
 
@@ -30,6 +32,10 @@ export type Photo = {
   contributor?: string;
   /** ids of the people in the photograph (see `family`) */
   people?: string[];
+  /** uploaded media: video or photo, when it was taken and how we know */
+  kind?: "image" | "video";
+  when?: PhotoDate;
+  memoryId?: string;
   placeholder?: boolean;
 };
 
@@ -122,6 +128,8 @@ export type Profile = {
   intro: Localized;
   /** shown only when the family provides them */
   years?: Localized;
+  /** Rosa's birth year, when known: lets photo estimates use her apparent age */
+  birthYear?: number;
   portraitId: string;
   secondaryPortraitId?: string;
   closing: Localized;

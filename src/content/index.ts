@@ -14,6 +14,7 @@ export const profile: Profile = {
     he: "מקום אחד לכל מה שאנחנו זוכרים ממנה. תמונות, סרטונים, סיפורים ומתכונים. כל אחד מוסיף משהו, ויחד מתגלה סיפור החיים שלה.",
     ru: "Одно место для всего, что мы о ней помним. Фотографии, видео, истории и рецепты. Каждый добавляет что-то своё, и вместе складывается история её жизни.",
   },
+  // birthYear: 1930, // fill in when the family confirms it; photo date estimates then use her age
   portraitId: "portrait",
   secondaryPortraitId: "portrait-2",
   closing: { he: "לנצח בלב שלנו", ru: "Навсегда в наших сердцах" },

@@ -21,7 +21,12 @@ export function cloudStore<T extends Base>(collection: string, db: D1Like, files
         // file names are generated here; nothing the visitor typed becomes a storage key
         const name = `${crypto.randomUUID()}.${f.ext}`;
         await files.put(key(id, name), f.data, { httpMetadata: { contentType: TYPES[f.ext] } });
-        stored.push({ name, kind: f.kind, size: f.data.byteLength });
+        let thumb: string | undefined;
+        if (f.thumb) {
+          thumb = `${crypto.randomUUID()}.jpg`;
+          await files.put(key(id, thumb), f.thumb, { httpMetadata: { contentType: "image/jpeg" } });
+        }
+        stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category });
       }
       const record = { ...fields, id, status: "pending", createdAt: new Date().toISOString(), files: stored } as T;
       await db
@@ -47,18 +52,30 @@ export function cloudStore<T extends Base>(collection: string, db: D1Like, files
       await db.prepare("UPDATE records SET status = ?1, data = ?2 WHERE collection = ?3 AND id = ?4").bind(status, JSON.stringify(next), collection, id).run();
       return next;
     },
+    async update(id, change) {
+      const cur = await this.get(id);
+      if (!cur) return undefined;
+      const next = change(cur);
+      await db.prepare("UPDATE records SET status = ?1, data = ?2 WHERE collection = ?3 AND id = ?4").bind(next.status, JSON.stringify(next), collection, id).run();
+      return next;
+    },
+    async putFile(id, data, ext) {
+      const name = `${crypto.randomUUID()}.${ext}`;
+      await files.put(key(id, name), data, { httpMetadata: { contentType: TYPES[ext] } });
+      return name;
+    },
     async removeFiles(id) {
       const cur = await this.get(id);
       if (!cur || !cur.files.length) return 0;
-      await files.delete(cur.files.map((f) => key(id, f.name)));
-      const freed = cur.files.reduce((s, f) => s + f.size, 0);
+      await files.delete(cur.files.flatMap((f) => [key(id, f.name), ...(f.thumb ? [key(id, f.thumb)] : [])]));
+      const freed = cur.files.reduce((s, f) => s + f.size + (f.thumbSize ?? 0), 0);
       const next = { ...cur, files: [] };
       await db.prepare("UPDATE records SET data = ?1 WHERE collection = ?2 AND id = ?3").bind(JSON.stringify(next), collection, id).run();
       return freed;
     },
     async usedBytes() {
       const row = await db
-        .prepare("SELECT COALESCE(SUM(json_extract(f.value, '$.size')), 0) AS used FROM records, json_each(records.data, '$.files') AS f WHERE records.collection = ?1")
+        .prepare("SELECT COALESCE(SUM(json_extract(f.value, '$.size') + COALESCE(json_extract(f.value, '$.thumbSize'), 0)), 0) AS used FROM records, json_each(records.data, '$.files') AS f WHERE records.collection = ?1")
         .bind(collection)
         .first<{ used: number }>();
       return Number(row?.used ?? 0);

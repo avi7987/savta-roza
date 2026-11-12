@@ -9,5 +9,7 @@
   "d1_databases": [{ "binding": "DB", "database_name": "savta-roza", "database_id": "5657cd13-5423-42a8-8e69-95919e067c2c", "migrations_dir": "migrations" }],
   // uploaded photos, videos and recordings
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "savta-roza-files" }],
+  // vision model that estimates when old photos were taken
+  "ai": { "binding": "AI" },
   "observability": { "enabled": true }
 }

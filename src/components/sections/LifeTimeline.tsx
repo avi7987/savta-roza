@@ -10,6 +10,9 @@ import { ease } from "@/lib/motion";
 import ArchivalImage from "../ArchivalImage";
 import { useLightbox } from "../Lightbox";
 import { Container, PlaceholderTag, SectionIntro, cn } from "../ui";
+import { TLink } from "../Transition";
+import { usePhotos } from "../gallery/usePhotos";
+import { decadeLabel, decadeOf, isEstimate } from "@/lib/photoDate";
 
 const confIcon: Record<Confidence, typeof BadgeCheck> = { exact: BadgeCheck, witness: MessageCircle, estimate: Sparkles };
 
@@ -145,6 +148,63 @@ export default function LifeTimeline() {
           ))}
         </ol>
       </Container>
+      <PhotoYears />
     </section>
+  );
+}
+
+/** Decades as the photos tell them: built from every approved photo's date. */
+function PhotoYears() {
+  const { t, lang } = useLang();
+  const { photos } = usePhotos();
+  const { open } = useLightbox();
+  const dated = photos.filter((p) => p.year);
+  if (!dated.length) return null;
+  const decades = Array.from(new Set(dated.map((p) => decadeOf(p.year!)))).sort((a, b) => a - b);
+  return (
+    <Container className="mt-[clamp(4rem,8vw,7rem)]">
+      <div className="flex flex-col gap-3 border-t border-line pt-12">
+        <h3 className="text-[clamp(1.8rem,3vw,2.6rem)] font-light text-burgundy">{t.timeline.photoYears}</h3>
+        <p className="max-w-xl text-ink-soft">{t.timeline.photoYearsLead}</p>
+      </div>
+      <ol className="mt-10 flex flex-col">
+        {decades.map((d, i) => {
+          const list = dated.filter((p) => decadeOf(p.year!) === d).sort((a, b) => a.year! - b.year!);
+          const estimated = list.every((p) => isEstimate(p.when));
+          const label = decadeLabel(d, lang);
+          return (
+            <motion.li
+              key={d}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "0px 0px -10% 0px" }}
+              transition={{ duration: 0.7, ease, delay: (i % 3) * 0.05 }}
+              className="grid gap-5 border-b border-line py-8 sm:grid-cols-[11rem_1fr] sm:gap-10"
+            >
+              <div className="flex flex-col gap-2">
+                <span className="font-display text-[2rem] font-light leading-none text-burgundy">{label}</span>
+                <span className="text-sm text-ink-soft">{t.timeline.photos(list.length)}</span>
+                <ConfidenceMark c={estimated ? "estimate" : "exact"} />
+              </div>
+              <div className="flex flex-col gap-4">
+                <ul className="flex flex-wrap gap-2.5">
+                  {list.slice(0, 6).map((p, k) => (
+                    <li key={p.id}>
+                      <button type="button" onClick={() => open(list, k)} aria-label={`${t.gallery.open} · ${p.year}`} className="block h-24 overflow-hidden rounded-[3px] bg-mount shadow-[var(--shadow-paper)] transition-transform duration-500 hover:-translate-y-0.5 sm:h-28" style={{ aspectRatio: Math.min(Math.max(p.ratio, 0.6), 1.8) }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.src} alt="" loading="lazy" className="h-full w-full object-cover" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <TLink href={`/gallery#d-${d}`} className="w-fit text-[0.95rem] text-burgundy underline decoration-dusty/50 underline-offset-4">
+                  {t.timeline.seeDecade(label)}
+                </TLink>
+              </div>
+            </motion.li>
+          );
+        })}
+      </ol>
+    </Container>
   );
 }

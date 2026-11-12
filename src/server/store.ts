@@ -8,7 +8,22 @@ import "server-only";
 
 export type Status = "pending" | "approved" | "rejected";
 
-export type StoredFile = { name: string; kind: "image" | "video" | "audio"; size: number };
+import type { PhotoDate } from "@/lib/photoDate";
+import type { CategoryId } from "@/content/types";
+
+export type StoredFile = {
+  name: string;
+  kind: "image" | "video" | "audio";
+  size: number;
+  /** a small JPEG preview stored next to the original */
+  thumb?: string;
+  thumbSize?: number;
+  width?: number;
+  height?: number;
+  /** when it was taken, and how we know */
+  date?: PhotoDate;
+  category?: CategoryId;
+};
 
 export type Base = { id: string; status: Status; files: StoredFile[]; createdAt: string; reviewedAt?: string };
 
@@ -41,13 +56,26 @@ export type StoredPerson = Base & {
   partnerOf?: string;
 };
 
-export type NewFile = { data: Uint8Array; ext: string; kind: StoredFile["kind"] };
+export type NewFile = {
+  data: Uint8Array;
+  ext: string;
+  kind: StoredFile["kind"];
+  thumb?: Uint8Array;
+  width?: number;
+  height?: number;
+  date?: PhotoDate;
+  category?: CategoryId;
+};
 
 export interface Store<T extends Base> {
   create(fields: Omit<T, keyof Base>, files: NewFile[]): Promise<T>;
   list(status?: Status): Promise<T[]>;
   get(id: string): Promise<T | undefined>;
   setStatus(id: string, status: Status): Promise<T | undefined>;
+  /** change a record (e.g. a photo's date after it was estimated) */
+  update(id: string, change: (cur: T) => T): Promise<T | undefined>;
+  /** store one more file for a record (e.g. a preview made later); returns its generated name */
+  putFile(id: string, data: Uint8Array, ext: string): Promise<string>;
   readFile(id: string, name: string): Promise<Uint8Array | undefined>;
   /** delete a record's files (e.g. after it was rejected); returns the bytes freed */
   removeFiles(id: string): Promise<number>;
@@ -84,6 +112,8 @@ function lazy<T extends Base>(collection: string): Store<T> {
     list: async (s) => (await b()).list(s),
     get: async (id) => (await b()).get(id),
     setStatus: async (id, s) => (await b()).setStatus(id, s),
+    update: async (id, c) => (await b()).update(id, c),
+    putFile: async (id, d, e) => (await b()).putFile(id, d, e),
     readFile: async (id, name) => (await b()).readFile(id, name),
     removeFiles: async (id) => (await b()).removeFiles(id),
     usedBytes: async () => (await b()).usedBytes(),

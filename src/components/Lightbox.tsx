@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { Photo } from "@/content/types";
 import { useLang } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
+import { formatDate, sourceLabel } from "@/lib/photoDate";
 import ArchivalImage from "./ArchivalImage";
 import { getLenis } from "./Transition";
 import { PlaceholderTag } from "./ui";
@@ -40,7 +41,7 @@ export function LightboxProvider({ children }: { children: ReactNode }) {
 }
 
 function ImageLightbox({ photos, index, onIndex, onClose }: { photos: Photo[]; index: number; onIndex: (i: number) => void; onClose: () => void }) {
-  const { t, l, dir } = useLang();
+  const { t, l, dir, lang } = useLang();
   const closeRef = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const [direction, setDirection] = useState(0);
@@ -132,12 +133,25 @@ function ImageLightbox({ photos, index, onIndex, onClose }: { photos: Photo[]; i
             className="flex max-h-full w-full max-w-5xl touch-pan-y flex-col items-center gap-5"
           >
             <div className="w-full" style={{ maxWidth: `min(100%, calc(72svh * ${photo.ratio}))` }}>
-              <ArchivalImage photo={photo} reveal={false} sizes="90vw" />
+              {photo.kind === "video" && photo.full ? (
+                <video key={photo.full} src={photo.full} poster={photo.src} controls playsInline preload="metadata" className="w-full rounded-[var(--radius-photo)] bg-black" style={{ aspectRatio: photo.ratio }} />
+              ) : (
+                <ArchivalImage photo={{ ...photo, src: photo.full ?? photo.src }} reveal={false} sizes="90vw" />
+              )}
             </div>
             <figcaption className="flex max-w-xl flex-col items-center gap-2 text-center">
               {photo.caption && <span className="font-display text-xl text-ivory">{l(photo.caption)}</span>}
+              {photo.when?.source === "ai" && photo.when.clues && <span className="max-w-md text-[0.82rem] text-ivory/50">{photo.when.clues}</span>}
               <span className="flex flex-wrap items-center justify-center gap-x-3 text-sm text-ivory/60">
-                {photo.date && <span>{l(photo.date)}</span>}
+                {photo.when ? (
+                  <span>
+                    {formatDate(photo.when, lang)} · {sourceLabel(photo.when, lang)}
+                  </span>
+                ) : photo.date ? (
+                  <span>{l(photo.date)}</span>
+                ) : photo.memoryId ? (
+                  <span>{sourceLabel(undefined, lang)}</span>
+                ) : null}
                 {photo.contributor && (
                   <span>
                     {t.lightbox.by}: {photo.contributor}

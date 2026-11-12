@@ -8,7 +8,11 @@ import { useLang } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
 import ArchivalImage from "../ArchivalImage";
 import { useLightbox } from "../Lightbox";
-import { Container, PlaceholderTag, SectionIntro, cn } from "../ui";
+import { Container, PlaceholderTag, SectionIntro, buttonClass, cn } from "../ui";
+import { TLink } from "../Transition";
+import JustifiedGrid from "../gallery/JustifiedGrid";
+import { usePhotos } from "../gallery/usePhotos";
+import { decadeLabel, decadeOf } from "@/lib/photoDate";
 
 /** photos that belong to the album (portraits and video covers live elsewhere) */
 const albumPhotos = allPhotos.filter((p) => p.category);
@@ -37,7 +41,44 @@ function GalleryItem({ photo, onOpen, index }: { photo: Photo; onOpen: () => voi
   );
 }
 
+/** the family's own photos: a taste of the album, with the way into the full gallery */
+function GalleryPreview({ photos }: { photos: Photo[] }) {
+  const { t, lang } = useLang();
+  const { open } = useLightbox();
+  const decades = Array.from(new Set(photos.map((p) => (p.year ? decadeOf(p.year) : null)).filter((d): d is number => d !== null))).sort((a, b) => b - a);
+  const preview = photos.slice(0, 18);
+  return (
+    <section id="gallery" aria-labelledby="gallery-title" className="py-[var(--spacing-section)]">
+      <Container wide>
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <SectionIntro id="gallery-title" eyebrow={t.gallery.eyebrow} title={t.gallery.title} lead={t.gallery.lead} />
+          {decades.length > 0 && (
+            <nav aria-label={t.gallery.jump} className="flex flex-wrap gap-2 lg:max-w-[34rem] lg:justify-end">
+              {decades.map((d) => (
+                <TLink key={d} href={`/gallery#d-${d}`} className="min-h-10 rounded-full border border-charcoal/15 bg-white px-4 py-2 text-[0.9rem] text-charcoal transition-colors hover:border-burgundy hover:text-burgundy">
+                  {decadeLabel(d, lang)}
+                </TLink>
+              ))}
+            </nav>
+          )}
+        </div>
+        <JustifiedGrid photos={preview} onOpen={(p) => open(preview, preview.indexOf(p))} rowHeight={240} className="mt-12" />
+        <div className="mt-10 flex justify-center">
+          <TLink href="/gallery" className={buttonClass.primary}>
+            {t.gallery.viewAll(photos.length)}
+          </TLink>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
 export default function PhotoGallery() {
+  const { photos } = usePhotos();
+  return photos.length ? <GalleryPreview photos={photos} /> : <PlaceholderGallery />;
+}
+
+function PlaceholderGallery() {
   const { t } = useLang();
   const { open } = useLightbox();
   const [filter, setFilter] = useState<CategoryId | null>(null);

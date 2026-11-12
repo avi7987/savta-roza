@@ -8,6 +8,91 @@ import { FamilyGraph, expandRequest, mergePeople, type TreePerson } from "@/lib/
 import type { Status, StoredFile, StoredMemory, StoredPerson } from "@/server/store";
 import { RoseBud } from "@/components/Botanical";
 import { cn } from "@/components/ui";
+import { formatDate, sourceLabel } from "@/lib/photoDate";
+import { thumbFromBlob } from "@/lib/mediaPrep";
+import type { CategoryId } from "@/content/types";
+
+const CAT_HE: Record<CategoryId, string> = { family: "משפחה", childhood: "ילדות", celebrations: "חגיגות", travel: "טיולים", moments: "רגעים מיוחדים", grandchildren: "נכדים" };
+
+/** When a photo was taken: shown, corrected, or estimated on request. */
+function FileMeta({ memoryId, file, token, onSaved }: { memoryId: string; file: StoredFile; token: string; onSaved: (msg: string) => void }) {
+  const [year, setYear] = useState(file.date?.year ? String(file.date.year) : "");
+  const [cat, setCat] = useState<string>(file.category ?? "");
+  const [busy, setBusy] = useState<"" | "save" | "ai">("");
+  const [note, setNote] = useState("");
+  if (file.kind === "audio") return null;
+
+  const save = async () => {
+    setBusy("save");
+    const y = Number(year);
+    const res = await fetch(`/api/memories/${memoryId}`, {
+      method: "PATCH",
+      headers: { "x-admin-token": token, "Content-Type": "application/json" },
+      body: JSON.stringify({ files: [{ name: file.name, date: year ? { year: y } : undefined, category: cat }] }),
+    });
+    setBusy("");
+    onSaved(res.ok ? "נשמר." : "השמירה לא הצליחה.");
+  };
+
+  const estimate = async () => {
+    setBusy("ai");
+    setNote("");
+    const fd = new FormData();
+    fd.set("file", file.name);
+    // older uploads have no preview yet: make one here from the photo itself
+    if (!file.thumb && file.kind === "image") {
+      try {
+        const r = await fetch(`/api/files/memories/${memoryId}/${file.name}`, { headers: { "x-admin-token": token } });
+        const t = await thumbFromBlob(await r.blob());
+        if (t.thumb) {
+          fd.set("thumb", t.thumb, "thumb.jpg");
+          fd.set("width", String(t.width));
+          fd.set("height", String(t.height));
+        }
+      } catch {}
+    }
+    const res = await fetch(`/api/memories/${memoryId}/estimate`, { method: "POST", headers: { "x-admin-token": token }, body: fd });
+    const data = await res.json().catch(() => ({}));
+    setBusy("");
+    if (data.ok) onSaved("ההערכה עודכנה.");
+    else setNote("לא הצלחנו להעריך את התמונה הזו כרגע. אפשר לכתוב שנה ידנית.");
+  };
+
+  return (
+    <div className="mt-2 flex flex-col gap-2 rounded-md bg-ivory p-3 text-sm">
+      <span className="text-charcoal">
+        <b>מתי צולם:</b> {file.date ? `${formatDate(file.date, "he")} · ${sourceLabel(file.date, "he")}` : "עוד לא ידוע"}
+      </span>
+      {file.date?.source === "ai" && file.date.clues && <span className="text-ink-soft">{file.date.clues}</span>}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-1.5">
+          שנה
+          <input type="number" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value)} placeholder="1968" className="w-24 rounded border border-charcoal/20 bg-white px-2 py-1.5" />
+        </label>
+        <label className="flex items-center gap-1.5">
+          נושא
+          <select value={cat} onChange={(e) => setCat(e.target.value)} className="rounded border border-charcoal/20 bg-white px-2 py-1.5">
+            <option value="">—</option>
+            {(Object.keys(CAT_HE) as CategoryId[]).map((c) => (
+              <option key={c} value={c}>
+                {CAT_HE[c]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={save} disabled={!!busy} className="min-h-9 rounded-full bg-charcoal px-4 text-white disabled:opacity-50">
+          {busy === "save" ? "שומרים…" : "שמירה"}
+        </button>
+        {(file.kind === "image" || file.thumb) && (
+          <button type="button" onClick={estimate} disabled={!!busy} className="min-h-9 rounded-full border border-burgundy/30 px-4 text-burgundy disabled:opacity-50">
+            {busy === "ai" ? "מעריכים…" : "הערכה אוטומטית"}
+          </button>
+        )}
+      </div>
+      {note && <span className="text-burgundy">{note}</span>}
+    </div>
+  );
+}
 
 type Kind = "memories" | "family";
 type Item = StoredMemory | StoredPerson;
@@ -318,7 +403,22 @@ export default function AdminPage() {
                       {item.files.length > 0 && (
                         <div className="mt-4 grid gap-3 sm:grid-cols-2">
                           {item.files.map((f) => (
-                            <FilePreview key={f.name} collection={kind} id={item.id} file={f} token={token} />
+                            <div key={f.name}>
+                              <FilePreview collection={kind} id={item.id} file={f} token={token} />
+                              {kind === "memories" && (
+                                <FileMeta
+                                  key={`${f.name}-${f.date?.year ?? ""}-${f.date?.source ?? ""}-${f.category ?? ""}`}
+                                  memoryId={item.id}
+                                  file={f}
+                                  token={token}
+                                  onSaved={(msg) => {
+                                    setToast(msg);
+                                    setTimeout(() => setToast(""), 2600);
+                                    load(token);
+                                  }}
+                                />
+                              )}
+                            </div>
                           ))}
                         </div>
                       )}
