@@ -57,6 +57,8 @@ ADMIN_TOKEN="a-long-private-password" npm run dev
 
 ## Deploying to Cloudflare
 
+The Worker `savta-roza-1` is connected to this GitHub repository (Workers Builds): every push to `main` builds and deploys automatically. `wrangler deploy` runs the OpenNext build first (see `build` in `wrangler.jsonc`). To deploy by hand:
+
 ```bash
 npx opennextjs-cloudflare build
 ```
