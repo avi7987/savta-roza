@@ -30,7 +30,14 @@ export type StoredFile = {
   deleteRequest?: DeleteRequest;
   /** last time the date estimate was tried (so it is retried later, not on every visit) */
   aiTriedAt?: string;
+  /** family members tagged in this photo (ids in the family tree) */
+  people?: string[];
+  /** what family members told us about this photo ("tell us more") */
+  notes?: FileNote[];
 };
+
+/** One family member's answer to "tell us more about this photo". Human-provided, attributed, never merged silently. */
+export type FileNote = { at: string; by?: string; people?: string[]; who?: string; when?: string; place?: string; what?: string };
 
 export type DeleteRequest = { at: string; reason?: string; by?: string };
 

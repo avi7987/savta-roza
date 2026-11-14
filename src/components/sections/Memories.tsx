@@ -32,12 +32,13 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
 
   return (
     <motion.article
+      id={m.placeholder ? undefined : `m-${m.id}`}
       initial={{ opacity: 0, y: 28 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "0px 0px -8% 0px" }}
       transition={{ duration: 0.8, ease, delay: (index % 3) * 0.08 }}
       className={cn(
-        "group relative mb-8 flex break-inside-avoid flex-col rounded-[var(--radius-card)] p-6 shadow-[var(--shadow-paper)] ring-1 ring-charcoal/[0.04] transition-[transform,box-shadow] duration-500 hover:-translate-y-1 hover:shadow-[var(--shadow-lift)] sm:p-8",
+        "group relative mb-8 flex scroll-mt-28 break-inside-avoid flex-col rounded-[var(--radius-card)] p-6 shadow-[var(--shadow-paper)] ring-1 ring-charcoal/[0.04] transition-[transform,box-shadow] duration-500 hover:-translate-y-1 hover:shadow-[var(--shadow-lift)] sm:p-8",
         tone
       )}
     >

@@ -8,6 +8,7 @@ import type { Lang } from "@/content/types";
 import { profile } from "@/content";
 import { RoseBud } from "./Botanical";
 import { TLink, getLenis } from "./Transition";
+import SearchButton from "./Search";
 import { cn } from "./ui";
 import { ease } from "@/lib/motion";
 
@@ -43,12 +44,11 @@ export function LanguageSwitcher({ className, large }: { className?: string; lar
   );
 }
 
+// four places only: her story, the album, the family, and adding a memory (the button)
 const LINKS = [
-  { id: "top", key: "home", href: "/#top" },
   { id: "story", key: "story", href: "/#story" },
-  { id: "family", key: "family", href: "/#family" },
-  { id: "memories", key: "memories", href: "/#memories" },
   { id: "gallery", key: "gallery", href: "/gallery" },
+  { id: "family", key: "family", href: "/#family" },
 ] as const;
 
 export default function Header() {
@@ -127,7 +127,8 @@ export default function Header() {
             ))}
           </nav>
 
-          <div className="ms-auto flex items-center gap-2 md:ms-4">
+          <div className="ms-auto flex items-center gap-1 md:ms-4 sm:gap-2">
+            <SearchButton />
             <LanguageSwitcher className="hidden sm:flex" />
             <TLink
               href="/share"

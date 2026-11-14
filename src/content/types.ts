@@ -33,7 +33,12 @@ export type Photo = {
   /** ids of the people in the photograph (see `family`) */
   people?: string[];
   /** uploaded media: video or photo, when it was taken and how we know */
-  kind?: "image" | "video";
+  kind?: "image" | "video" | "audio";
+  /** the words shared together with this photo */
+  story?: string;
+  storyLang?: Lang;
+  /** what family members told about it ("tell us more") */
+  notes?: { at: string; by?: string; people?: string[]; who?: string; when?: string; place?: string; what?: string }[];
   when?: PhotoDate;
   memoryId?: string;
   /** stored file name within the memory (for dating and removal requests) */

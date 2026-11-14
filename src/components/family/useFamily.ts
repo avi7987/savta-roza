@@ -59,7 +59,7 @@ export function useFamily() {
     return new FamilyGraph(mergePeople(mergePeople(seed, approved), mine));
   }, [approved, local]);
 
-  const photos = real;
+  const photos = useMemo(() => real.filter((p) => p.kind !== "audio"), [real]);
 
   const relLabel = useCallback(
     (id: string) => {

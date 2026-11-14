@@ -7,7 +7,10 @@ import { STATIC } from "../Transition";
 
 type ApiPhoto = {
   id: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "audio";
+  story?: string;
+  lang?: "he" | "ru";
+  notes?: Photo["notes"];
   src: string;
   full: string;
   poster?: string;
@@ -25,6 +28,7 @@ type ApiPhoto = {
 
 const ALT = { he: "תמונה מהאלבום המשפחתי", ru: "Фотография из семейного альбома" };
 const VIDEO_ALT = { he: "סרטון מהאלבום המשפחתי", ru: "Видео из семейного альбома" };
+const AUDIO_ALT = { he: "הקלטה מהאלבום המשפחתי", ru: "Запись из семейного альбома" };
 
 let cache: Photo[] | null = null;
 let pending: Promise<Photo[]> | null = null;
@@ -49,7 +53,10 @@ function load(): Promise<Photo[]> {
         full: p.full,
         kind: p.kind,
         ratio: p.ratio > 0.2 && p.ratio < 5 ? p.ratio : 4 / 3,
-        alt: p.kind === "video" ? VIDEO_ALT : ALT,
+        alt: p.kind === "video" ? VIDEO_ALT : p.kind === "audio" ? AUDIO_ALT : ALT,
+        story: p.story,
+        storyLang: p.lang,
+        notes: p.notes,
         caption: p.caption ? { he: p.caption, ru: p.caption } : undefined,
         when: p.date,
         year: p.year,

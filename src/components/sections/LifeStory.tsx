@@ -166,7 +166,8 @@ function Undated({ photos }: { photos: Photo[] }) {
 /** Her life, decade by decade, told by whatever the family has shared so far. */
 export default function LifeStory() {
   const { t, lang } = useLang();
-  const { photos, loaded } = usePhotos();
+  const { photos: all, loaded } = usePhotos();
+  const photos = useMemo(() => all.filter((p) => p.kind !== "audio"), [all]);
   const [notes, setNotes] = useState<Notes>({});
 
   useEffect(() => {

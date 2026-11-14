@@ -12,7 +12,6 @@ export async function GET() {
   const memories = (await store.list()).filter((m) => m.status !== "rejected");
   const photos = memories.flatMap((m) =>
     m.files
-      .filter((f) => f.kind !== "audio")
       .map((f) => {
         const url = (n: string) => `/api/files/memories/${m.id}/${n}`;
         return {
@@ -21,11 +20,14 @@ export async function GET() {
           src: url(f.thumb ?? f.name),
           full: url(f.name),
           poster: f.kind === "video" && f.thumb ? url(f.thumb) : undefined,
+          story: m.body?.trim() || undefined,
+          lang: m.lang,
           ratio: f.width && f.height ? f.width / f.height : 4 / 3,
           date: f.date,
           year: sortYear(f.date),
           category: f.category,
-          people: m.people ?? [],
+          people: Array.from(new Set([...(m.people ?? []), ...(f.people ?? [])])),
+          notes: (f.notes ?? []).map((n) => ({ at: n.at, by: n.by, who: n.who, when: n.when, place: n.place, what: n.what, people: n.people })),
           contributor: m.author,
           caption: m.title,
           memoryId: m.id,
