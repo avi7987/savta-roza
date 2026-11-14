@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { LIMITS, detectLang, maxBytes } from "@/lib/limits";
+import { LIMITS, detectLang, kindOf, maxBytes } from "@/lib/limits";
 import { rateLimited } from "@/server/auth";
 import { sniff } from "@/server/sniff";
 import { family as seed } from "@/content/family";
-import { familyStore, store, type StoredMemory } from "@/server/store";
+import { MEMORY_TYPES, familyStore, store, type MemoryType, type StoredMemory } from "@/server/store";
 import { afterStore, canStore } from "@/server/quota";
 import { analyzeMemory, later } from "@/server/analyze";
 import { cleanDate, type PhotoDate } from "@/lib/photoDate";
@@ -43,6 +43,7 @@ const publicShape = (m: StoredMemory) => {
   const url = (n: string) => `/api/files/memories/${m.id}/${n}`;
   return {
     id: m.id,
+    type: m.type,
     author: m.author,
     relation: m.relation,
     title: m.title,
@@ -80,6 +81,8 @@ export async function POST(req: Request) {
   const author = clean(form.get("name"), LIMITS.name);
   const relation = clean(form.get("relation"), LIMITS.relation) || undefined;
   const title = clean(form.get("title"), LIMITS.title) || undefined;
+  const rawType = clean(form.get("type"), 20) as MemoryType;
+  const type = MEMORY_TYPES.includes(rawType) ? rawType : undefined;
   const body = clean(form.get("memory"), LIMITS.body);
   // only ids that exist in the tree can be tagged
   const known = new Set(seed.map((p) => p.id));
@@ -103,7 +106,9 @@ export async function POST(req: Request) {
   const files: NewFile[] = [];
   for (const [i, f] of uploads.slice(0, LIMITS.maxFiles).entries()) {
     const data = new Uint8Array(await f.arrayBuffer());
-    const found = sniff(data);
+    let found = sniff(data);
+    // a recording made in the browser comes in a video container (webm, mp4) with sound only
+    if (found?.kind === "video" && kindOf(f.type) === "audio") found = { kind: "audio", ext: found.ext === "mp4" ? "m4a" : found.ext };
     if (!found) {
       errors.push("type");
       continue;
@@ -149,7 +154,7 @@ export async function POST(req: Request) {
   if (!(await canStore(files.reduce((s, f) => s + f.data.byteLength, 0)))) return NextResponse.json({ error: "full" }, { status: 507 });
 
   // shared memories appear on the site straight away; only the owner can remove them
-  const saved = await store.create({ author, relation, title, body, people: people.length ? people : undefined, lang: detectLang(`${title ?? ""} ${body}`) }, files, "approved");
+  const saved = await store.create({ type, author, relation, title, body, people: people.length ? people : undefined, lang: detectLang(`${title ?? ""} ${body}`) }, files, "approved");
   if (files.length) await afterStore();
   // estimate dates for undated photos (and check "dated" scans) after answering the visitor
   if (files.some((f) => f.kind !== "audio" && f.date?.source !== "user")) await later(analyzeMemory(saved.id));

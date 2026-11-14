@@ -30,10 +30,13 @@ export default function Contribute() {
           </Item>
         </Reveal>
         <ul className="grid grid-cols-2 gap-3 lg:col-span-5 lg:col-start-8">
-          {[Camera, Video, BookOpen, Mic].map((Icon, i) => (
-            <li key={i} className="flex flex-col gap-3 rounded-[var(--radius-card)] bg-white/[0.07] p-5 ring-1 ring-white/10">
-              <Icon className="h-6 w-6 text-blush" strokeWidth={1.3} aria-hidden />
-              <span className="text-[1rem] leading-snug text-ivory/90">{t.contribute.kinds[i]}</span>
+          {([[Camera, "photos"], [Video, "video"], [BookOpen, "story"], [Mic, "audio"]] as const).map(([Icon, type], i) => (
+            <li key={type}>
+              {/* each kind starts the "add a memory" steps already on its own page */}
+              <TLink href={`/share?type=${type}`} className="flex h-full flex-col gap-3 rounded-[var(--radius-card)] bg-white/[0.07] p-5 ring-1 ring-white/10 transition-colors hover:bg-white/[0.13] focus-visible:outline-ivory">
+                <Icon className="h-6 w-6 text-blush" strokeWidth={1.3} aria-hidden />
+                <span className="text-[1rem] leading-snug text-ivory/90">{t.contribute.kinds[i]}</span>
+              </TLink>
             </li>
           ))}
         </ul>

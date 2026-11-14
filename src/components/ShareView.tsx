@@ -5,7 +5,7 @@ import { profile } from "@/content";
 import { useLang } from "@/lib/i18n";
 import { LeafSprig, RoseBud } from "./Botanical";
 import { LanguageSwitcher } from "./Header";
-import MemorySubmissionForm from "./MemorySubmissionForm";
+import AddMemoryWizard from "./share/AddMemoryWizard";
 import { TLink } from "./Transition";
 import { Container, Item, Reveal } from "./ui";
 
@@ -25,24 +25,24 @@ export default function ShareView() {
       </header>
 
       <main id="content">
-        <Container wide className="grid gap-14 pb-[var(--spacing-section)] pt-8 lg:grid-cols-12 lg:gap-x-16 lg:pt-16">
-          <Reveal className="flex flex-col gap-6 lg:col-span-4">
+        <Container wide className="grid gap-8 pb-[var(--spacing-section)] pt-4 sm:gap-14 sm:pt-8 lg:grid-cols-12 lg:gap-x-16 lg:pt-16">
+          <Reveal className="flex flex-col gap-4 sm:gap-6 lg:col-span-4">
             <Item className="flex items-center gap-3 text-burgundy">
               <RoseBud className="h-10 w-7" still />
               <span className="font-display text-xl">{l(profile.name)}</span>
             </Item>
-            <Item as="h1" className="text-[clamp(2.6rem,5.5vw,4.4rem)] font-light leading-[1.05] text-burgundy">
+            <Item as="h1" className="text-[clamp(2.2rem,5.5vw,4.4rem)] font-light leading-[1.05] text-burgundy">
               {t.share.title}
             </Item>
-            <Item as="p" className="max-w-md text-lg leading-[1.85] text-ink-soft">
+            <Item as="p" className="hidden max-w-md text-lg leading-[1.85] text-ink-soft sm:block">
               {t.share.lead}
             </Item>
             <Item>
               <LeafSprig className="mt-4 hidden w-56 lg:block" />
             </Item>
           </Reveal>
-          <div className="rounded-[var(--radius-card)] bg-paper p-6 shadow-[var(--shadow-paper)] ring-1 ring-charcoal/[0.04] sm:p-10 lg:col-span-7 lg:col-start-6">
-            <MemorySubmissionForm />
+          <div className="rounded-[var(--radius-card)] bg-paper p-5 shadow-[var(--shadow-paper)] ring-1 ring-charcoal/[0.04] sm:p-10 lg:col-span-7 lg:col-start-6">
+            <AddMemoryWizard />
           </div>
         </Container>
       </main>
