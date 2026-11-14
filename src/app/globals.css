@@ -5,6 +5,15 @@
   Layout concept: an editorial family archive. Ivory paper, generous margins,
   photographs mounted like an album, one botanical line drawing per chapter.
 */
+:root {
+  --font-frank: "Frank Ruhl Libre";
+  --font-cormorant: "Cormorant Garamond";
+  --font-heebo: "Heebo";
+  --font-roboto: "Roboto";
+  --font-playpen: "Playpen Sans Hebrew";
+  --font-caveat: "Caveat";
+}
+
 @theme {
   /* palette (spec 3.1) */
   --color-ivory: #f8f2ed;

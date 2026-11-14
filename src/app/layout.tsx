@@ -1,14 +1,26 @@
 import type { Metadata, Viewport } from "next";
-import { Caveat, Cormorant_Garamond, Frank_Ruhl_Libre, Heebo, Playpen_Sans_Hebrew, Roboto } from "next/font/google";
 import Shell from "@/components/Shell";
+// the fonts ship with the site instead of being fetched from Google at build time
+import "@fontsource/frank-ruhl-libre/300.css";
+import "@fontsource/frank-ruhl-libre/400.css";
+import "@fontsource/frank-ruhl-libre/500.css";
+import "@fontsource/cormorant-garamond/300.css";
+import "@fontsource/cormorant-garamond/400.css";
+import "@fontsource/cormorant-garamond/500.css";
+import "@fontsource/cormorant-garamond/300-italic.css";
+import "@fontsource/cormorant-garamond/400-italic.css";
+import "@fontsource/cormorant-garamond/500-italic.css";
+import "@fontsource/heebo/300.css";
+import "@fontsource/heebo/400.css";
+import "@fontsource/heebo/500.css";
+import "@fontsource/roboto/cyrillic-300.css";
+import "@fontsource/roboto/cyrillic-400.css";
+import "@fontsource/roboto/cyrillic-500.css";
+import "@fontsource/playpen-sans-hebrew/hebrew-300.css";
+import "@fontsource/playpen-sans-hebrew/hebrew-400.css";
+import "@fontsource/caveat/400.css";
+import "@fontsource/caveat/500.css";
 import "./globals.css";
-
-const frank = Frank_Ruhl_Libre({ variable: "--font-frank", subsets: ["hebrew", "latin"], weight: ["300", "400", "500"], display: "swap" });
-const cormorant = Cormorant_Garamond({ variable: "--font-cormorant", subsets: ["cyrillic", "latin"], weight: ["300", "400", "500"], style: ["normal", "italic"], display: "swap" });
-const heebo = Heebo({ variable: "--font-heebo", subsets: ["hebrew", "latin"], weight: ["300", "400", "500"], display: "swap" });
-const roboto = Roboto({ variable: "--font-roboto", subsets: ["cyrillic"], weight: ["300", "400", "500"], display: "swap" });
-const playpen = Playpen_Sans_Hebrew({ variable: "--font-playpen", subsets: ["hebrew"], weight: ["300", "400"], display: "swap" });
-const caveat = Caveat({ variable: "--font-caveat", subsets: ["cyrillic", "latin"], weight: ["400", "500"], display: "swap" });
 
 export const metadata: Metadata = {
   title: "סבתא רוזה · Бабушка Роза",
@@ -19,9 +31,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#f8f2ed", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const fonts = [frank, cormorant, heebo, roboto, playpen, caveat].map((f) => f.variable).join(" ");
   return (
-    <html lang="he" dir="rtl" className={fonts} suppressHydrationWarning>
+    <html lang="he" dir="rtl" suppressHydrationWarning>
       <body>
         <Shell>{children}</Shell>
       </body>
