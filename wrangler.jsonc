@@ -11,5 +11,12 @@
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "savta-roza-files" }],
   // vision model that estimates when old photos were taken
   "ai": { "binding": "AI" },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // branch previews (e.g. redesign) use the family's real memories and photos, so a
+  // new design can be judged with the real content. Anything added there is real.
+  "previews": {
+    "d1_databases": [{ "binding": "DB", "database_id": "5657cd13-5423-42a8-8e69-95919e067c2c" }],
+    "r2_buckets": [{ "binding": "FILES", "bucket_name": "savta-roza-files" }],
+    "ai": { "binding": "AI" }
+  }
 }
