@@ -6,6 +6,7 @@ import { resolvePeople } from "@/server/people";
 import { MEMORY_TYPES, store, type MemoryType, type StoredMemory } from "@/server/store";
 import { afterStore, canStore } from "@/server/quota";
 import { analyzeMemory, later } from "@/server/analyze";
+import { enqueueMemory, runJobs } from "@/server/knowledge";
 import { cleanDate, type PhotoDate } from "@/lib/photoDate";
 import type { CategoryId } from "@/content/types";
 import type { NewFile } from "@/server/store";
@@ -157,6 +158,9 @@ export async function POST(req: Request) {
   if (files.length) await afterStore();
   // estimate dates for undated photos (and check "dated" scans) after answering the visitor
   if (files.some((f) => f.kind !== "audio" && f.date?.source !== "user")) await later(analyzeMemory(saved.id));
+  // read its letters, write down its recordings, and look for facts, in the background
+  await enqueueMemory(saved);
+  await later(runJobs({ memoryId: saved.id }));
   // new memories wait for a moderator; nothing is published automatically
   return NextResponse.json({ ok: true, id: saved.id, status: saved.status, skipped }, { status: 201 });
 }

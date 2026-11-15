@@ -4,6 +4,8 @@ import { cleanDate, formatDate } from "@/lib/photoDate";
 import { rateLimited } from "@/server/auth";
 import { store, type FileNote } from "@/server/store";
 import { resolvePeople } from "@/server/people";
+import { enqueueFacts, runJobs } from "@/server/knowledge";
+import { later } from "@/server/analyze";
 
 export const runtime = "nodejs";
 
@@ -55,5 +57,10 @@ export async function POST(req: Request) {
           }
     ),
   }));
+  // what the family told may hold facts about Rosa's life
+  if (note.what || note.place) {
+    await enqueueFacts(m.id);
+    await later(runJobs({ memoryId: m.id }));
+  }
   return NextResponse.json({ ok: true, dated: !!(date && canDate), file: updated?.files.find((x) => x.name === f.name) });
 }

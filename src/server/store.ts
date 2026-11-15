@@ -168,9 +168,36 @@ export type R2Like = {
 export const store: Store<StoredMemory> = lazy<StoredMemory>("memories");
 export const familyStore: Store<StoredPerson> = lazy<StoredPerson>("family");
 
+/* ---------- what the site learns from the archive (see server/knowledge) ---------- */
+
+/** text read out of a file: a letter's words (ocr) or what is said in a recording (transcript) */
+export type StoredText = Base & { memoryId: string; file?: string; source: "ocr" | "transcript"; text: string; model?: string };
+
+export type FactSource = { memoryId: string; file?: string; kind: "memory" | "note" | "ocr" | "transcript" | "owner"; quote?: string };
+/**
+ * One thing known about Rosa's life. status: pending = a suggestion (found by the computer or a
+ * visitor, not checked), approved = verified by the site's owner, rejected = wrong.
+ */
+export type StoredFact = Base & {
+  statement: string;
+  statementRu?: string;
+  category: "origin" | "family" | "home" | "work" | "events" | "traits" | "food" | "other";
+  year?: number;
+  place?: string;
+  people?: string[];
+  sources: FactSource[];
+  by: "ai" | "owner";
+};
+
+/** background work waiting to be done. status: pending = to do, approved = done, rejected = gave up */
+export type StoredJob = Base & { type: "ocr" | "transcribe" | "facts"; memoryId: string; file?: string; attempts: number; error?: string };
+
 /** People named in photos and memories who are not (yet) in the family tree: one shared list. */
 export type StoredName = Base & { name: string; addedBy?: string };
 export const namesStore: Store<StoredName> = lazy<StoredName>("names");
+export const textStore: Store<StoredText> = lazy<StoredText>("texts");
+export const factStore: Store<StoredFact> = lazy<StoredFact>("facts");
+export const jobStore: Store<StoredJob> = lazy<StoredJob>("jobs");
 
 /** bytes used by every uploaded file, across memories and the family tree */
 export async function storageUsed() {

@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, Flag, Image as ImageIcon, LogOut, Mic, RefreshCw, Trash2, Undo2, Video, X } from "lucide-react";
+import { Check, ExternalLink, Flag, Image as ImageIcon, LogOut, Mic, RefreshCw, Sparkles, Trash2, Undo2, Video, X } from "lucide-react";
 import { family as seed } from "@/content/family";
 import { FamilyGraph, expandRequest, mergePeople, type TreePerson } from "@/lib/family";
 import type { Status, StoredFile, StoredMemory, StoredPerson } from "@/server/store";
@@ -13,6 +13,7 @@ import { sha256, thumbFromBlob } from "@/lib/mediaPrep";
 import { compare } from "@/lib/dedupe";
 import type { CategoryId } from "@/content/types";
 import PeopleManager from "./PeopleManager";
+import KnowledgeManager from "./KnowledgeManager";
 
 const CAT_HE: Record<CategoryId, string> = { family: "משפחה", childhood: "ילדות", celebrations: "חגיגות", travel: "טיולים", moments: "רגעים מיוחדים", grandchildren: "נכדים" };
 
@@ -97,7 +98,7 @@ function FileMeta({ memoryId, file, token, onSaved }: { memoryId: string; file: 
 }
 
 type Kind = "memories" | "family";
-type Section = "removals" | "memories" | "family" | "people" | "story";
+type Section = "removals" | "memories" | "family" | "people" | "knowledge" | "story";
 type Item = StoredMemory | StoredPerson;
 
 const TABS: { id: Status; label: string; empty: string }[] = [
@@ -136,6 +137,27 @@ function StoryEditor({ token, memories, onSaved }: { token: string; memories: St
 
   const decades = Array.from(new Set([...counts.keys(), ...Object.keys(notes).map(Number), ...extra])).sort((a, b) => a - b);
   const missing = ALL_DECADES.filter((d) => !decades.includes(d));
+
+  const [drafting, setDrafting] = useState<number | null>(null);
+  const [drafts, setDrafts] = useState<Record<number, { id: string }[]>>({});
+  /** a first draft from the verified facts of this decade, put into the fields for the owner to edit */
+  const draft = async (d: number, form: HTMLFormElement) => {
+    setDrafting(d);
+    const r = await fetch("/api/admin/story-draft", { method: "POST", headers: { "x-admin-token": token, "Content-Type": "application/json" }, body: JSON.stringify({ decade: d }) }).catch(() => null);
+    setDrafting(null);
+    if (r?.status === 409) return onSaved("אין עדיין עובדות מאומתות לעשור הזה. אפשר לאשר עובדות בלשונית \"ידע על רוזה\".");
+    if (!r?.ok) return onSaved("לא הצלחנו לכתוב טיוטה כרגע. נסו שוב מאוחר יותר.");
+    const v = (await r.json()) as { title: string; text: string; titleRu: string; textRu: string; facts: { id: string }[] };
+    const set = (name: string, value: string) => {
+      const el = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | null;
+      if (el && value) el.value = value;
+    };
+    set("title", v.title);
+    set("text", v.text);
+    set("titleRu", v.titleRu);
+    set("textRu", v.textRu);
+    setDrafts((x) => ({ ...x, [d]: v.facts }));
+  };
 
   const save = async (d: number, form: HTMLFormElement) => {
     const v = Object.fromEntries(new FormData(form)) as Record<string, string>;
@@ -188,9 +210,20 @@ function StoryEditor({ token, memories, onSaved }: { token: string; memories: St
                 <textarea name="textRu" defaultValue={n.textRu ?? ""} maxLength={2000} rows={4} lang="ru" className={field} />
               </label>
             </div>
-            <button type="submit" disabled={busy === d} className="min-h-11 w-fit rounded-full bg-rose px-6 text-white hover:bg-burgundy disabled:opacity-50">
-              {busy === d ? "שומרים…" : "שמירה"}
-            </button>
+            {drafts[d] && (
+              <p className="rounded-md bg-blush/30 px-3 py-2 text-[0.88rem] text-burgundy">
+                טיוטה נכתבה מ־{drafts[d].length} עובדות מאומתות. קראו, תקנו ושמרו. שום דבר לא עולה לאתר לפני השמירה.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button type="submit" disabled={busy === d} className="min-h-11 w-fit rounded-full bg-rose px-6 text-white hover:bg-burgundy disabled:opacity-50">
+                {busy === d ? "שומרים…" : "שמירה"}
+              </button>
+              <button type="button" disabled={drafting === d} onClick={(e) => draft(d, e.currentTarget.form!)} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-burgundy/30 px-5 text-burgundy disabled:opacity-50">
+                <Sparkles className="h-4 w-4" aria-hidden />
+                {drafting === d ? "כותבים טיוטה…" : "טיוטה מהעובדות המאומתות"}
+              </button>
+            </div>
           </form>
         );
       })}
@@ -474,6 +507,7 @@ export default function AdminPage() {
                     ["memories", "כל התוכן", data.memories.filter((m) => m.status === "pending").length],
                     ["family", "עץ המשפחה", count("family", "pending")],
                     ["people", "אנשים", 0],
+                    ["knowledge", "ידע על רוזה", 0],
                     ["story", "סיפור החיים", 0],
                   ] as [Section, string, number][]
                 ).map(([k, label, n]) => (
@@ -502,6 +536,16 @@ export default function AdminPage() {
 
             {section === "people" && (
               <PeopleManager
+                token={token}
+                onDone={(msg) => {
+                  setToast(msg);
+                  setTimeout(() => setToast(""), 4200);
+                }}
+              />
+            )}
+
+            {section === "knowledge" && (
+              <KnowledgeManager
                 token={token}
                 onDone={(msg) => {
                   setToast(msg);

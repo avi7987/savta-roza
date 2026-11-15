@@ -13,6 +13,7 @@ import { usePhotos } from "../gallery/usePhotos";
 import { Container, SectionIntro, buttonClass, cn } from "../ui";
 
 type Notes = Record<string, { title?: string; text?: string; titleRu?: string; textRu?: string }>;
+type Fact = { id: string; statement: string; statementRu?: string; year?: number; place?: string; sources: string[] };
 
 const FEATURED = 5;
 const ROTATE_MS = 7000;
@@ -78,7 +79,7 @@ function useFeatured(all: Photo[], count: number, active: boolean) {
   return shown;
 }
 
-function Decade({ decade, photos, note, index }: { decade: number; photos: Photo[]; note?: { title?: string; text?: string }; index: number }) {
+function Decade({ decade, photos, note, facts, index }: { decade: number; photos: Photo[]; note?: { title?: string; text?: string }; facts: Fact[]; index: number }) {
   const { t, lang } = useLang();
   const { open } = useLightbox();
   const ref = useRef<HTMLElement>(null);
@@ -108,6 +109,25 @@ function Decade({ decade, photos, note, index }: { decade: number; photos: Photo
           <TLink href={`/gallery#d-${decade}`} className="w-fit text-[0.95rem] text-burgundy underline decoration-dusty/50 underline-offset-4">
             {t.story.seeAll(photos.length, label)}
           </TLink>
+        )}
+        {facts.length > 0 && (
+          <section aria-label={t.story.known} className="mt-2 flex flex-col gap-2 border-s-2 border-sage/50 ps-4">
+            <h4 className="label !text-sage-deep">{t.story.known}</h4>
+            <ul className="flex flex-col gap-1.5">
+              {facts.map((f) => (
+                <li key={f.id} className="text-[0.98rem] leading-relaxed text-charcoal/90">
+                  {f.year && <span className="me-1.5 tabular-nums text-ink-soft">{f.year}</span>}
+                  {lang === "ru" ? f.statementRu || f.statement : f.statement}
+                  {f.sources[0] && (
+                    <a href={`#m-${f.sources[0]}`} className="ms-1.5 text-[0.8rem] text-burgundy underline decoration-dusty/50 underline-offset-4">
+                      {t.story.source}
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <span className="text-[0.75rem] text-ink-soft">{t.story.knownNote}</span>
+          </section>
         )}
         {approx && <span className="text-[0.8rem] text-ink-soft">≈ {t.story.estimated}</span>}
       </div>
@@ -169,12 +189,17 @@ export default function LifeStory() {
   const { photos: all, loaded } = usePhotos();
   const photos = useMemo(() => all.filter((p) => p.kind !== "audio"), [all]);
   const [notes, setNotes] = useState<Notes>({});
+  const [facts, setFacts] = useState<Fact[]>([]);
 
   useEffect(() => {
     if (STATIC) return;
     fetch("/api/story")
       .then((r) => (r.ok ? r.json() : { decades: {} }))
       .then((d: { decades: Notes }) => setNotes(d.decades ?? {}))
+      .catch(() => {});
+    fetch("/api/facts")
+      .then((r) => (r.ok ? r.json() : { facts: [] }))
+      .then((d: { facts: Fact[] }) => setFacts(d.facts ?? []))
       .catch(() => {});
   }, []);
 
@@ -194,9 +219,10 @@ export default function LifeStory() {
       const n = notes[k];
       if (!by.has(d) && (n.title || n.text || n.titleRu || n.textRu)) by.set(d, []);
     }
+    for (const f of facts) if (f.year && !by.has(decadeOf(f.year))) by.set(decadeOf(f.year), []);
     for (const list of by.values()) list.sort((a, b) => (a.year ?? 0) - (b.year ?? 0));
     return { decades: [...by.entries()].sort((a, b) => a[0] - b[0]), undated: none };
-  }, [photos, notes]);
+  }, [photos, notes, facts]);
 
   const noteFor = (d: number) => {
     const n = notes[String(d)];
@@ -232,7 +258,7 @@ export default function LifeStory() {
         ) : (
           <div className="mt-16 flex flex-col gap-[clamp(4rem,9vw,8rem)]">
             {decades.map(([d, list], i) => (
-              <Decade key={d} decade={d} photos={list} note={noteFor(d)} index={i} />
+              <Decade key={d} decade={d} photos={list} note={noteFor(d)} facts={facts.filter((f) => f.year && decadeOf(f.year) === d)} index={i} />
             ))}
             {undated.length > 0 && <Undated photos={undated} />}
           </div>
