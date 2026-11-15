@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { peopleDirectory } from "@/server/people";
+import { nearest } from "@/server/semantic";
 import { decadeOf, formatDate, sortYear } from "@/lib/photoDate";
 import { store } from "@/server/store";
 
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
   // names of tagged people: from the tree and from the shared list
   const { nameOf } = await peopleDirectory();
 
-  const results: { type: "photo" | "memory"; id: string; ids?: string[]; count?: number; memoryId: string; file?: string; kind?: string; title?: string; text?: string; author: string; year?: number; src?: string; score: number }[] = [];
+  const results: { type: "photo" | "memory"; id: string; ids?: string[]; count?: number; memoryId: string; file?: string; kind?: string; title?: string; text?: string; author: string; year?: number; src?: string; score: number; related?: boolean }[] = [];
   for (const m of await store.list()) {
     if (m.status === "rejected") continue;
     const base = [m.title, m.body, m.author, m.relation, ...(m.people ?? []).map(nameOf)].filter(Boolean).join(" \n ");
@@ -77,5 +78,23 @@ export async function GET(req: Request) {
     }
   }
   results.sort((a, b) => b.score - a.score);
+
+  // when the exact words find little, add what is close in meaning (other words, the other language)
+  if (results.length < 6 && q.length >= 3) {
+    const near = await nearest(q, 10, 0.5).catch(() => null);
+    const seen = new Set(results.map((r) => r.memoryId));
+    for (const h of near ?? []) {
+      if (!h.memoryId || seen.has(h.memoryId)) continue;
+      const m = await store.get(h.memoryId);
+      if (!m || m.status === "rejected") continue;
+      seen.add(m.id);
+      const f = m.files.find((x) => (h.file ? x.name === h.file : x.kind !== "audio")) ?? m.files.find((x) => x.kind !== "audio");
+      const url = (n: string) => `/api/files/memories/${m.id}/${n}`;
+      if (f && f.kind !== "audio") {
+        const all = m.files.filter((x) => x.kind !== "audio");
+        results.push({ type: "photo", id: `${m.id}.${f.name}`, ids: [f, ...all.filter((x) => x !== f)].map((x) => `${m.id}.${x.name}`), count: all.length, memoryId: m.id, file: f.name, kind: f.kind, title: m.title, text: h.text.slice(0, 220), author: m.author, year: sortYear(f.date), src: url(f.thumb ?? f.name), score: 0, related: true });
+      } else results.push({ type: "memory", id: m.id, memoryId: m.id, title: m.title, text: h.text.slice(0, 280), author: m.author, score: 0, related: true });
+    }
+  }
   return NextResponse.json({ results: results.slice(0, 40) }, { headers: { "Cache-Control": "no-cache" } });
 }

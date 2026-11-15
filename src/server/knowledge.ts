@@ -1,6 +1,7 @@
 import "server-only";
 import { profile } from "@/content";
 import { MODELS, base64, budgetLeft, chat, parseJson, runAi } from "./ai";
+import { indexMemory } from "./semantic";
 import { factStore, jobStore, store, textStore, type FactSource, type StoredFact, type StoredJob, type StoredMemory } from "./store";
 
 /*
@@ -42,14 +43,16 @@ export async function enqueueMemory(m: StoredMemory) {
     if (f.kind === "image" && TYPES_TO_READ.has(m.type ?? "")) await enqueue("ocr", m.id, f.name);
   }
   await enqueue("facts", m.id);
+  await enqueue("index", m.id);
 }
 
 /** after the family told more about a photo, look at the memory again */
 export async function enqueueFacts(memoryId: string) {
   await enqueue("facts", memoryId);
+  await enqueue("index", memoryId);
 }
 
-const ORDER: Record<StoredJob["type"], number> = { ocr: 0, transcribe: 0, facts: 1 };
+const ORDER: Record<StoredJob["type"], number> = { ocr: 0, transcribe: 0, facts: 1, index: 2 };
 
 /**
  * Do some of the waiting work. Stops when the day's share of the AI allowance is used; what is
@@ -62,18 +65,19 @@ export async function runJobs(opts: { memoryId?: string; limit?: number } = {}) 
   let done = 0;
   for (const j of jobs.slice(0, opts.limit ?? 6)) {
     // a memory's facts wait until its letters and recordings are read
-    if (j.type === "facts" && jobs.some((o) => o.memoryId === j.memoryId && o.type !== "facts" && o.status === "pending" && o.id !== j.id)) continue;
-    const budget = j.type === "transcribe" ? "speech" : "background";
+    if ((j.type === "facts" || j.type === "index") && jobs.some((o) => o.memoryId === j.memoryId && ORDER[o.type] < ORDER[j.type] && o.status === "pending" && o.id !== j.id)) continue;
+    const budget = j.type === "transcribe" ? "speech" : j.type === "index" ? "embed" : "background";
     if ((await budgetLeft(budget)) <= 0) break;
     let ok: boolean | "skip" = false;
     let error: string | undefined;
     try {
-      ok = j.type === "ocr" ? await readImage(j) : j.type === "transcribe" ? await transcribe(j) : await findFacts(j.memoryId);
+      ok = j.type === "ocr" ? await readImage(j) : j.type === "transcribe" ? await transcribe(j) : j.type === "index" ? await indexMemory(j.memoryId) : await findFacts(j.memoryId);
     } catch (e) {
       error = String((e as Error)?.message ?? e).slice(0, 200);
     }
     if (ok) {
       await jobStore.setStatus(j.id, "approved");
+      j.status = "approved";
       done++;
     } else {
       const attempts = j.attempts + 1;
@@ -222,6 +226,6 @@ export async function queueState() {
   return {
     waiting: all.filter((j) => j.status === "pending").length,
     failed: all.filter((j) => j.status === "rejected").map((j) => ({ id: j.id, type: j.type, memoryId: j.memoryId, error: j.error })),
-    budget: { background: await budgetLeft("background"), speech: await budgetLeft("speech") },
+    budget: { background: await budgetLeft("background"), speech: await budgetLeft("speech"), embed: await budgetLeft("embed") },
   };
 }

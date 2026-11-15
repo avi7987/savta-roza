@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdmin } from "@/server/auth";
 import { aiAvailable } from "@/server/ai";
 import { enqueueMemory, queueState, runJobs } from "@/server/knowledge";
+import { indexFact, indexState } from "@/server/semantic";
 import { factStore, jobStore, store, textStore, type StoredFact } from "@/server/store";
 
 export const runtime = "nodejs";
@@ -13,9 +14,9 @@ const CATEGORIES: StoredFact["category"][] = ["origin", "family", "home", "work"
 /** Everything the site has learned, for the owner to check. */
 export async function GET(req: Request) {
   if (!(await isAdmin(req))) return json({ error: "unauthorized" }, 401);
-  const [facts, texts, memories, queue, ai] = await Promise.all([factStore.list(), textStore.list("approved"), store.list(), queueState(), aiAvailable()]);
+  const [facts, texts, memories, queue, ai, index] = await Promise.all([factStore.list(), textStore.list("approved"), store.list(), queueState(), aiAvailable(), indexState()]);
   const titles = Object.fromEntries(memories.map((m) => [m.id, { title: m.title || m.body.slice(0, 60), author: m.author }]));
-  return json({ facts, texts, titles, queue, ai });
+  return json({ facts, texts, titles, queue, ai, index });
 }
 
 /**
@@ -32,6 +33,8 @@ export async function POST(req: Request) {
     case "reject":
     case "suggest": {
       const r = await factStore.setStatus(id, b.action === "verify" ? "approved" : b.action === "reject" ? "rejected" : "pending");
+      // only verified facts are searchable and used in answers
+      if (r) await indexFact(r).catch(() => false);
       return r ? json({ ok: true, fact: r }) : json({ error: "not found" }, 404);
     }
     case "edit":
@@ -49,11 +52,13 @@ export async function POST(req: Request) {
       if (b.action === "add") {
         // what the owner writes is verified by definition
         const made = await factStore.create({ ...fields, sources: [{ memoryId: "", kind: "owner" }], by: "owner" }, [], "approved");
+        await indexFact(made).catch(() => false);
         return json({ ok: true, fact: made });
       }
       // a corrected fact is checked by the person who corrected it
       const r = await factStore.update(id, (cur) => ({ ...cur, ...fields }));
-      if (r) await factStore.setStatus(id, "approved");
+      const v = r ? await factStore.setStatus(id, "approved") : undefined;
+      if (v) await indexFact(v).catch(() => false);
       return r ? json({ ok: true }) : json({ error: "not found" }, 404);
     }
     case "process": {
@@ -64,6 +69,8 @@ export async function POST(req: Request) {
       // everything shared before the engine existed gets its turn, a little each day
       const all = (await store.list()).filter((m) => m.status !== "rejected");
       for (const m of all) await enqueueMemory(m);
+      // verified facts that are not searchable yet (added while the AI was unavailable)
+      for (const f of await factStore.list("approved")) await indexFact(f).catch(() => false);
       return json({ ok: true, memories: all.length, queue: await queueState() });
     }
     case "retry": {

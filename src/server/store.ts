@@ -189,8 +189,11 @@ export type StoredFact = Base & {
   by: "ai" | "owner";
 };
 
+/** a piece of the archive in "meaning space" (an embedding), so search can find it by sense, not only by words */
+export type StoredVector = Base & { kind: "memory" | "note" | "ocr" | "transcript" | "fact"; memoryId?: string; file?: string; factId?: string; text: string; vec: string };
+
 /** background work waiting to be done. status: pending = to do, approved = done, rejected = gave up */
-export type StoredJob = Base & { type: "ocr" | "transcribe" | "facts"; memoryId: string; file?: string; attempts: number; error?: string };
+export type StoredJob = Base & { type: "ocr" | "transcribe" | "facts" | "index"; memoryId: string; file?: string; attempts: number; error?: string };
 
 /** People named in photos and memories who are not (yet) in the family tree: one shared list. */
 export type StoredName = Base & { name: string; addedBy?: string };
@@ -198,6 +201,7 @@ export const namesStore: Store<StoredName> = lazy<StoredName>("names");
 export const textStore: Store<StoredText> = lazy<StoredText>("texts");
 export const factStore: Store<StoredFact> = lazy<StoredFact>("facts");
 export const jobStore: Store<StoredJob> = lazy<StoredJob>("jobs");
+export const vectorStore: Store<StoredVector> = lazy<StoredVector>("vectors");
 
 /** bytes used by every uploaded file, across memories and the family tree */
 export async function storageUsed() {
