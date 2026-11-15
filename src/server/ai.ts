@@ -21,16 +21,21 @@ export const MODELS = {
 
 type Ai = { run(model: string, input: unknown): Promise<unknown> };
 
-async function binding(): Promise<Ai | undefined> {
+export async function binding(): Promise<Ai | undefined> {
+  // development with CF_AI_ACCOUNT: straight to the REST API (the local proxy for the binding
+  // needs a connection to Cloudflare that is not always available)
+  if (process.env.CF_AI_ACCOUNT) return rest(process.env.CF_AI_ACCOUNT);
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare");
     const { env } = await getCloudflareContext({ async: true });
     const ai = (env as unknown as { AI?: Ai }).AI;
     if (ai) return ai;
   } catch {}
-  const account = process.env.CF_AI_ACCOUNT;
-  if (!account) return undefined;
-  // development: the REST API, with the credential supplied by the environment
+  return undefined;
+}
+
+/** the REST API, with the credential supplied by the environment */
+function rest(account: string): Ai {
   return {
     async run(model, input) {
       const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/ai/run/${model}`, {

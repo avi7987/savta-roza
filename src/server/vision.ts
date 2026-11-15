@@ -2,6 +2,7 @@ import "server-only";
 import { profile } from "@/content";
 import type { CategoryId } from "@/content/types";
 import { cleanDate, thisYear, validYear, type PhotoDate } from "@/lib/photoDate";
+import { binding } from "./ai";
 
 /*
   Estimating when a photo was taken, with a vision model on Cloudflare Workers AI
@@ -12,18 +13,6 @@ import { cleanDate, thisYear, validYear, type PhotoDate } from "@/lib/photoDate"
 
 const MODEL = "@cf/mistralai/mistral-small-3.1-24b-instruct";
 const CATEGORIES: CategoryId[] = ["family", "childhood", "celebrations", "travel", "moments", "grandchildren"];
-
-type Ai = { run(model: string, input: unknown): Promise<unknown> };
-
-async function binding(): Promise<Ai | undefined> {
-  try {
-    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
-    const { env } = await getCloudflareContext({ async: true });
-    return (env as unknown as { AI?: Ai }).AI;
-  } catch {
-    return undefined;
-  }
-}
 
 const base64 = (b: Uint8Array) => {
   let s = "";

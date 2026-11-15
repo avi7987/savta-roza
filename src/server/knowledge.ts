@@ -165,7 +165,8 @@ export async function findFacts(memoryId: string): Promise<boolean | "skip"> {
   const m = await store.get(memoryId);
   if (!m || m.status === "rejected") return "skip";
   const parts = await corpus(m);
-  if (!parts.length) return true;
+  // a few words (a caption, a title) are too little to learn facts from
+  if (parts.reduce((n, p) => n + p.text.trim().length, 0) < 40) return true;
   const numbered = parts.map((p, i) => `[${i + 1}] (${p.kind})\n${p.text}`).join("\n\n");
   const who = m.author ? `It was shared by ${m.author}${m.relation ? ` (${m.relation})` : ""}.` : "";
   const answer = await chat("background", [
@@ -174,6 +175,9 @@ export async function findFacts(memoryId: string): Promise<boolean | "skip"> {
       content: `You help a family keep a record of the life of their grandmother Rosa (${profile.birthYear ? `born ${profile.birthYear}` : "born in the 1930s"}). You read what family members wrote and list FACTS about Rosa's life that the text states clearly: where she was born or lived, family events (marriage, children, moves), work, habits, dishes she cooked, things she loved, dates.
 Rules:
 - Only what the text says. Never guess, infer or add knowledge. If unsure, leave it out.
+- The statement must not say more than its quote: no "every summer", "always", "with the grandchildren" unless those words are in the text.
+- A title or caption of a few words (e.g. "the sea at Bat Yam") is not a fact about Rosa by itself; skip it unless the text says what Rosa did.
+- Ignore text that is clearly a test or not about the family.
 - Each fact must include "quote": a short phrase copied EXACTLY, character for character, from the text, that proves it.
 - "statement_he": one short sentence in Hebrew, about Rosa in the third person ("רוזה ..."). "statement_ru": the same in Russian.
 - "category": one of ${CATEGORIES.join(", ")}.

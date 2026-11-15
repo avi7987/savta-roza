@@ -81,10 +81,11 @@ export async function GET(req: Request) {
 
   // when the exact words find little, add what is close in meaning (other words, the other language)
   if (results.length < 6 && q.length >= 3) {
-    const near = await nearest(q, 10, 0.5).catch(() => null);
+    const near = await nearest(q, 12, 0.44).catch(() => null);
     const seen = new Set(results.map((r) => r.memoryId));
     for (const h of near ?? []) {
-      if (!h.memoryId || seen.has(h.memoryId)) continue;
+      // a few words (a caption) look "close" to almost anything; only real text counts here
+      if (!h.memoryId || seen.has(h.memoryId) || h.text.length < 40) continue;
       const m = await store.get(h.memoryId);
       if (!m || m.status === "rejected") continue;
       seen.add(m.id);

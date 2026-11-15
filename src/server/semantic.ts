@@ -10,7 +10,7 @@ import { factStore, store, textStore, vectorStore, type StoredFact, type StoredV
   on each search, without a separate (paid) vector database.
 */
 
-const CHUNK = 900;
+const CHUNK = 400;
 
 const toB64 = (v: number[]) => {
   const f = new Float32Array(v);
