@@ -12,6 +12,7 @@ import { decadeLabel, decadeOf, formatDate, sortYear, sourceLabel } from "@/lib/
 import { sha256, thumbFromBlob } from "@/lib/mediaPrep";
 import { compare } from "@/lib/dedupe";
 import type { CategoryId } from "@/content/types";
+import PeopleManager from "./PeopleManager";
 
 const CAT_HE: Record<CategoryId, string> = { family: "משפחה", childhood: "ילדות", celebrations: "חגיגות", travel: "טיולים", moments: "רגעים מיוחדים", grandchildren: "נכדים" };
 
@@ -96,7 +97,7 @@ function FileMeta({ memoryId, file, token, onSaved }: { memoryId: string; file: 
 }
 
 type Kind = "memories" | "family";
-type Section = "removals" | "memories" | "family" | "story";
+type Section = "removals" | "memories" | "family" | "people" | "story";
 type Item = StoredMemory | StoredPerson;
 
 const TABS: { id: Status; label: string; empty: string }[] = [
@@ -472,6 +473,7 @@ export default function AdminPage() {
                     ["removals", "בקשות הסרה", removals.length],
                     ["memories", "כל התוכן", data.memories.filter((m) => m.status === "pending").length],
                     ["family", "עץ המשפחה", count("family", "pending")],
+                    ["people", "אנשים מתויגים", 0],
                     ["story", "סיפור החיים", 0],
                   ] as [Section, string, number][]
                 ).map(([k, label, n]) => (
@@ -497,6 +499,16 @@ export default function AdminPage() {
             </div>
 
             {error && <p role="alert" className="mt-4 text-burgundy">{error}</p>}
+
+            {section === "people" && (
+              <PeopleManager
+                token={token}
+                onDone={(msg) => {
+                  setToast(msg);
+                  setTimeout(() => setToast(""), 4200);
+                }}
+              />
+            )}
 
             {section === "story" && (
               <StoryEditor
