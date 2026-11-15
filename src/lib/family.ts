@@ -6,34 +6,96 @@ export type RelKey = "self" | "spouse" | "parent" | "sibling" | "child" | "grand
 /** A person as the tree shows them: may be waiting for approval, or only saved in this browser. */
 export type TreePerson = Person & { pending?: boolean };
 
-/** A family tree built from a flat list of people. Every relation is derived, never typed in. */
+/**
+ * A family tree built from a flat list of people. Every relation is derived, never typed in.
+ * Links can be written on either side (a child lists its parents, or a parent lists the child it
+ * was added for; partners on either side), so the graph first gathers them into one picture.
+ * Parents nobody has named yet but who are implied (a sibling was added, Rosa's own parents) exist
+ * as "virtual" people: they hold siblings together and are never drawn as cards.
+ */
 export class FamilyGraph {
   readonly byId = new Map<string, TreePerson>();
+  readonly people: TreePerson[];
+  private parentsMap = new Map<string, string[]>();
+  private childrenMap = new Map<string, string[]>();
+  private partnersMap = new Map<string, string[]>();
   private depthCache = new Map<string, number | null>();
 
-  constructor(readonly people: TreePerson[]) {
+  constructor(input: TreePerson[]) {
+    const people = input.map((p) => ({ ...p }));
     people.forEach((p) => this.byId.set(p.id, p));
+    const add = (m: Map<string, string[]>, k: string, v: string) => {
+      if (k === v) return;
+      const l = m.get(k) ?? [];
+      if (!l.includes(v)) l.push(v);
+      m.set(k, l);
+    };
+    const virtual = (id: string) => {
+      if (this.byId.has(id)) return;
+      const v: TreePerson = { id, name: "", gender: "x", placeholder: true, virtual: true };
+      people.push(v);
+      this.byId.set(id, v);
+    };
+
+    for (const p of people) for (const x of p.parents ?? []) add(this.parentsMap, p.id, x);
+    for (const p of people) for (const c of p.children ?? []) if (this.byId.has(c)) add(this.parentsMap, c, p.id);
+    // brothers and sisters share parents; if those are unknown, an unnamed pair stands in
+    for (const p of people) {
+      const s = p.siblingOf;
+      if (!s || !this.byId.has(s) || s === p.id) continue;
+      if (!(this.parentsMap.get(s) ?? []).length) {
+        virtual(`v-${s}`);
+        add(this.parentsMap, s, `v-${s}`);
+      }
+      for (const x of this.parentsMap.get(s)!) add(this.parentsMap, p.id, x);
+    }
+    // parents named by id but not (yet) in the tree, e.g. Rosa's parents before anyone adds them
+    for (const [, list] of this.parentsMap) list.forEach(virtual);
+    for (const [child, list] of this.parentsMap) for (const x of list) add(this.childrenMap, x, child);
+    for (const p of people) for (const x of [p.partnerId, ...(p.partners ?? [])]) if (x && this.byId.has(x)) {
+      add(this.partnersMap, p.id, x);
+      add(this.partnersMap, x, p.id);
+    }
+    this.people = people;
   }
 
   get rosa() {
     return this.byId.get(ROSA)!;
   }
 
+  parentsOf(id: string) {
+    return this.parentsMap.get(id) ?? [];
+  }
+  /** parents with a name (or an empty slot someone can fill), not the implied unnamed ones */
+  realParentsOf(id: string) {
+    return this.parentsOf(id).filter((x) => !this.byId.get(x)?.virtual);
+  }
+  childrenOf(id: string) {
+    return this.childrenMap.get(id) ?? [];
+  }
+  partnersOf(id: string) {
+    return this.partnersMap.get(id) ?? [];
+  }
+  siblingsOf(id: string) {
+    const out = new Set<string>();
+    for (const par of this.parentsOf(id)) for (const c of this.childrenOf(par)) if (c !== id) out.add(c);
+    return [...out];
+  }
+
+  /** the first partner (most people have one) */
   partnerOf(id: string) {
-    const p = this.byId.get(id);
-    const direct = p?.partnerId ? this.byId.get(p.partnerId) : undefined;
-    return direct ?? this.people.find((x) => x.partnerId === id);
+    const x = this.partnersOf(id)[0];
+    return x ? this.byId.get(x) : undefined;
   }
 
   /** generations below Rosa: 1 = child, 2 = grandchild… ; null for anyone not descended from her */
   depth(id: string, guard = new Set<string>()): number | null {
     if (this.depthCache.has(id)) return this.depthCache.get(id)!;
-    if (id === ROSA || id === this.rosa.partnerId) return 0;
+    if (id === ROSA || this.partnersOf(ROSA).includes(id)) return 0;
     if (guard.has(id)) return null;
     guard.add(id);
-    const p = this.byId.get(id);
     let best: number | null = null;
-    for (const parent of p?.parents ?? []) {
+    for (const parent of this.parentsOf(id)) {
       const d = this.depth(parent, guard);
       if (d !== null && (best === null || d + 1 < best)) best = d + 1;
     }
@@ -45,28 +107,29 @@ export class FamilyGraph {
   ring(id: string): number | null {
     const d = this.depth(id);
     if (d !== null) return d;
-    const partner = this.partnerOf(id);
-    return partner ? this.depth(partner.id) : null;
+    for (const x of this.partnersOf(id)) {
+      const pd = this.depth(x);
+      if (pd !== null) return pd;
+    }
+    return null;
   }
 
-  /** how many generation rings the tree currently needs */
+  /** how many generations below Rosa the tree currently has */
   get generations() {
     return this.people.reduce((m, p) => Math.max(m, this.depth(p.id) ?? 0), 0);
   }
 
   relation(id: string): RelKey {
     if (id === ROSA) return "self";
-    if (this.rosa.partnerId === id) return "spouse";
-    if (this.rosa.parents?.includes(id)) return "parent";
-    const p = this.byId.get(id);
-    if (p?.parents?.some((x) => this.rosa.parents?.includes(x))) return "sibling";
+    if (this.partnersOf(ROSA).includes(id)) return "spouse";
+    if (this.parentsOf(ROSA).includes(id)) return "parent";
+    if (this.siblingsOf(ROSA).includes(id)) return "sibling";
     const d = this.depth(id);
     if (d === 1) return "child";
     if (d === 2) return "grandchild";
     if (d !== null && d >= 3) return "great";
-    const partner = this.partnerOf(id);
-    if (partner) {
-      const pd = this.depth(partner.id);
+    for (const x of this.partnersOf(id)) {
+      const pd = this.depth(x);
       if (pd === 1) return "childInLaw";
       if (pd !== null && pd >= 2) return "partner";
     }
@@ -75,20 +138,19 @@ export class FamilyGraph {
 
   /** the parent through which someone hangs in the tree */
   primaryParent(id: string): string | undefined {
-    const p = this.byId.get(id);
-    return p?.parents?.find((x) => this.depth(x) !== null);
+    return this.parentsOf(id).find((x) => this.depth(x) !== null);
   }
 
   /** which of Rosa's children this person's branch grows from */
   branchRoot(id: string): Person | undefined {
-    let cur = this.depth(id) === null ? this.partnerOf(id)?.id : id;
+    let cur: string | undefined = this.depth(id) === null ? this.partnersOf(id).find((x) => this.depth(x) !== null) : id;
     while (cur && (this.depth(cur) ?? 0) > 1) cur = this.primaryParent(cur);
     return cur && this.depth(cur) === 1 ? this.byId.get(cur) : undefined;
   }
 
   /** descendants hanging directly under this person (Rosa and her partner count as one) */
   kids(id: string) {
-    const parents = id === ROSA ? [ROSA, this.rosa.partnerId] : [id];
+    const parents = id === ROSA ? [ROSA, ...this.partnersOf(ROSA)] : [id];
     return this.people.filter((p) => {
       const pp = this.primaryParent(p.id);
       return pp && parents.includes(pp) && p.id !== ROSA;
@@ -97,13 +159,36 @@ export class FamilyGraph {
 
   /** everyone on one generation ring (not their partners) */
   generation(n: number) {
-    return this.people.filter((p) => this.depth(p.id) === n);
+    return this.people.filter((p) => !p.virtual && this.depth(p.id) === n);
   }
 
   roots() {
-    const parents = (this.rosa.parents ?? []).map((id) => this.byId.get(id)).filter(Boolean) as TreePerson[];
-    const siblings = this.people.filter((p) => p.id !== ROSA && this.relation(p.id) === "sibling");
+    const parents = this.parentsOf(ROSA).map((id) => this.byId.get(id)).filter((p): p is TreePerson => !!p && !p.virtual);
+    const siblings = this.siblingsOf(ROSA).map((id) => this.byId.get(id)!).filter((p) => !p.virtual);
     return { parents, siblings };
+  }
+
+  /**
+   * The row each person is drawn on: Rosa's generation is 0, her parents -1, her children 1.
+   * Partners share a row, so in-laws and their own parents find their place too.
+   */
+  levels() {
+    const level = new Map<string, number>();
+    const visit = (start: string, at: number) => {
+      const queue: [string, number][] = [[start, at]];
+      while (queue.length) {
+        const [id, l] = queue.shift()!;
+        if (level.has(id)) continue;
+        level.set(id, l);
+        for (const x of this.partnersOf(id)) queue.push([x, l]);
+        for (const x of this.childrenOf(id)) queue.push([x, l + 1]);
+        for (const x of this.parentsOf(id)) queue.push([x, l - 1]);
+      }
+    };
+    visit(ROSA, 0);
+    // anyone not linked to Rosa at all still gets a row
+    for (const p of this.people) if (!level.has(p.id)) visit(p.id, 0);
+    return level;
   }
 }
 
@@ -142,15 +227,37 @@ export type FamilyRequest = {
   grandparentName?: string;
   grandparentGender?: Gender;
   partnerOf?: string;
+  /** the newer, general way to place someone: their relation to any person already in the tree */
+  rel?: LinkRel;
+  of?: string;
+  /** for a child: the other parent (one of the partners of `of`), if known */
+  with?: string;
+  died?: string;
 };
+
+export type LinkRel = "child" | "partner" | "parent" | "sibling";
+export const LINK_RELS: LinkRel[] = ["child", "partner", "parent", "sibling"];
 
 /**
  * Turn one request into the people it adds. Missing links are created as quiet slots,
  * so a grandchild added first immediately brings the parents' ring with it.
  */
 export function expandRequest(req: FamilyRequest, baseId: string): TreePerson[] {
-  const details = { name: req.name, nameAlt: req.nameAlt, gender: req.gender, born: req.born, birthplace: req.birthplace, about: req.about, photoSrc: req.photoSrc };
+  const details = { name: req.name, nameAlt: req.nameAlt, gender: req.gender, born: req.born, died: req.died, birthplace: req.birthplace, about: req.about, photoSrc: req.photoSrc };
   if (req.replaces) return [{ id: req.replaces, ...details, placeholder: false }];
+
+  if (req.rel && req.of) {
+    switch (req.rel) {
+      case "child":
+        return [{ id: baseId, ...details, parents: [req.of, ...(req.with && req.with !== req.of ? [req.with] : [])] }];
+      case "partner":
+        return [{ id: baseId, ...details, partners: [req.of] }];
+      case "parent":
+        return [{ id: baseId, ...details, children: [req.of] }];
+      case "sibling":
+        return [{ id: baseId, ...details, siblingOf: req.of }];
+    }
+  }
 
   const out: TreePerson[] = [];
   const slot = (id: string, name: string | undefined, gender: Gender | undefined, parents: string[]): string => {
@@ -206,108 +313,6 @@ export function mergePeople(base: TreePerson[], additions: TreePerson[]) {
     }
   }
   return people;
-}
-
-/* ---------- radial layout: Rosa in the middle, one ring per generation that exists ---------- */
-
-type Pt = { x: number; y: number };
-export type PlacedNode = { id: string; x: number; y: number; ring: number; angle: number };
-export type Edge = { from: Pt; to: Pt; c1: Pt; c2: Pt; childId: string; parentId: string };
-
-/** ring radii (share of the half-width), spread evenly over however many generations exist */
-export function ringRadii(generations: number) {
-  if (generations <= 0) return [0];
-  const inner = generations === 1 ? 0.58 : 0.4;
-  const outer = 0.93;
-  return [0, ...Array.from({ length: generations }, (_, i) => (generations === 1 ? inner : inner + ((outer - inner) * i) / (generations - 1)))];
-}
-
-export function radialLayout(g: FamilyGraph, rtl: boolean) {
-  const rings = ringRadii(g.generations);
-  const nodes = new Map<string, PlacedNode>();
-  const edges: Edge[] = [];
-  const pol = (r: number, a: number) => ({ x: 0.5 + (r / 2) * Math.cos(a), y: 0.5 + (r / 2) * Math.sin(a) });
-
-  const slots = (id: string) => 1 + (g.partnerOf(id) && g.depth(g.partnerOf(id)!.id) === null ? 1 : 0);
-  const span = (id: string): number => Math.max(slots(id), g.kids(id).reduce((s, k) => s + span(k.id), 0));
-
-  // centre: Rosa and her partner side by side (Rosa on the reading side); the drawing is
-  // smaller while the tree is young, so they sit further apart then
-  const off = [0.12, 0.095, 0.075, 0.07][Math.min(g.generations, 3)];
-  nodes.set(ROSA, { id: ROSA, x: 0.5 + (rtl ? off : -off), y: 0.5, ring: 0, angle: 0 });
-  if (g.rosa.partnerId && g.byId.has(g.rosa.partnerId)) nodes.set(g.rosa.partnerId, { id: g.rosa.partnerId, x: 0.5 + (rtl ? -off : off), y: 0.5, ring: 0, angle: 0 });
-
-  const top = g.kids(ROSA);
-  const total = top.reduce((s, k) => s + span(k.id), 0) || 1;
-  // the family hangs downward from Rosa (her roots are above) and fans out as it grows,
-  // closing into a full circle only when there are many branches; the top stays open for the roots
-  const sweep = Math.min(Math.PI * 2 - 0.55, total * 1.05);
-  const unit = sweep / total;
-  const dir = rtl ? -1 : 1;
-  const angleAt = (m: number) => Math.PI / 2 + dir * (m - sweep / 2);
-
-  const place = (id: string, start: number, parentPt: Pt, parentR: number, parentA: number, parentId: string) => {
-    const ring = g.depth(id) ?? 1;
-    const r = rings[Math.min(ring, rings.length - 1)];
-    const width = span(id) * unit;
-    const mid = start + width / 2;
-    const partner = g.partnerOf(id);
-    const pairSep = partner && g.depth(partner.id) === null ? Math.min(unit * 0.5, 0.16 / r) : 0;
-    const a = angleAt(mid - pairSep);
-    const pt = pol(r, a);
-    nodes.set(id, { id, ...pt, ring, angle: a });
-    if (pairSep) {
-      const pa = angleAt(mid + pairSep);
-      nodes.set(partner!.id, { id: partner!.id, ...pol(r, pa), ring, angle: pa });
-    }
-    // a stem leaves the parent outward, then turns into the child's own direction
-    const bend = parentR + (r - parentR) * 0.55;
-    const c1 = parentR === 0 ? pol(r * 0.25, a) : pol(bend, parentA);
-    const c2 = pol(bend, a);
-    edges.push({ from: parentPt, to: pt, c1, c2, childId: id, parentId });
-    let s = start;
-    for (const k of g.kids(id)) {
-      place(k.id, s, pt, r, a, id);
-      s += span(k.id) * unit;
-    }
-  };
-
-  let s = 0;
-  for (const k of top) {
-    place(k.id, s, { x: 0.5, y: 0.5 }, 0, 0, ROSA);
-    s += span(k.id) * unit;
-  }
-  // the arc each ring actually needs, a little wider than the people on it
-  const pad = 0.22;
-  const full = sweep + 2 * pad >= Math.PI * 2 - 0.3;
-  const arc = full ? null : { from: angleAt(-pad), to: angleAt(sweep + pad) };
-
-  // crop the drawing to what is there, so a young tree is not lost in an empty circle
-  const pts: Pt[] = [...nodes.values()];
-  rings.slice(1).forEach((r) => {
-    for (let i = 0; i <= 24; i++) {
-      const a = arc ? arc.from + ((arc.to - arc.from) * i) / 24 : (Math.PI * 2 * i) / 24;
-      pts.push(pol(r, a));
-    }
-  });
-  const m = 0.07;
-  const minX = Math.max(0, Math.min(...pts.map((p) => p.x)) - m);
-  const maxX = Math.min(1, Math.max(...pts.map((p) => p.x)) + m);
-  const minY = Math.max(0, Math.min(...pts.map((p) => p.y)) - m);
-  const maxY = Math.min(1, Math.max(...pts.map((p) => p.y)) + m * 1.4);
-  const bounds = { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-
-  return { nodes, edges, rings, arc, bounds };
-}
-
-/** an SVG path along a ring between two angles (or the whole ring) */
-export function ringPath(r: number, arc: { from: number; to: number } | null) {
-  const steps = 72;
-  const pts = Array.from({ length: steps + 1 }, (_, i) => {
-    const a = arc ? arc.from + ((arc.to - arc.from) * i) / steps : (Math.PI * 2 * i) / steps;
-    return `${(50 + r * 50 * Math.cos(a)).toFixed(2)} ${(50 + r * 50 * Math.sin(a)).toFixed(2)}`;
-  });
-  return `M ${pts.join(" L ")}${arc ? "" : " Z"}`;
 }
 
 /** the chain of people from someone up to Rosa, for highlighting */

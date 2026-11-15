@@ -31,7 +31,7 @@ const madeBy = (r: StoredPerson) => (r.replaces ? [] : [`fam-${r.id}`, `fam-${r.
 
 /** other requests that hang from any of these ids (children, partners, details filled in) */
 function dependents(ids: string[], approved: StoredPerson[], except?: string) {
-  return approved.filter((r) => r.id !== except && [r.parentId, r.grandparentId, r.partnerOf, r.replaces].some((x) => x && ids.includes(x)));
+  return approved.filter((r) => r.id !== except && [r.parentId, r.grandparentId, r.partnerOf, r.replaces, r.of, r.with].some((x) => x && ids.includes(x)));
 }
 
 export type TreeInfo = { relation: string; parentId?: string; partnerId?: string; editable: boolean; movable: boolean; deletable: boolean; blockers: string[] };
@@ -41,7 +41,7 @@ export async function treeInfo() {
   const { approved, graph } = await treeState();
   const info: Record<string, TreeInfo> = {};
   for (const p of graph.people) {
-    if (p.id === ROSA) continue;
+    if (p.virtual) continue;
     const { main, filler } = backing(p.id, approved);
     const deps = main ? dependents(madeBy(main), approved, main.id) : [];
     const blockers = deps.filter((d) => !d.replaces || d.replaces !== p.id).map((d) => graph.byId.get(d.replaces ?? `fam-${d.id}`)?.name || d.name).filter(Boolean);
@@ -50,15 +50,15 @@ export async function treeInfo() {
       parentId: graph.primaryParent(p.id),
       partnerId: graph.partnerOf(p.id)?.id,
       editable: true,
-      movable: !!main && PLACES.includes(main.kind as RequestKind),
-      deletable: !!main || !!filler,
+      movable: !!main && (PLACES.includes(main.kind as RequestKind) || !!main.rel),
+      deletable: p.id !== ROSA && (!!main || !!filler),
       blockers,
     };
   }
   return { graph, info };
 }
 
-type Details = { name?: string; nameAlt?: string; gender?: string; born?: string; birthplace?: string };
+type Details = { name?: string; nameAlt?: string; gender?: string; born?: string; died?: string; birthplace?: string };
 type Place = { kind?: string; parentId?: string; partnerOf?: string };
 
 const clean = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/[\u0000-\u001F\u007F<>]/g, "").replace(/\s+/g, " ").trim().slice(0, n) : undefined);
@@ -72,6 +72,8 @@ function details(d: Details) {
   if (d.gender === "f" || d.gender === "m" || d.gender === "x") out.gender = d.gender;
   const born = clean(d.born, 20);
   if (born !== undefined) out.born = born || undefined;
+  const died = clean(d.died, 20);
+  if (died !== undefined) out.died = died || undefined;
   const place = clean(d.birthplace, 80);
   if (place !== undefined) out.birthplace = place || undefined;
   return out;
@@ -93,14 +95,15 @@ function below(graph: FamilyGraph, id: string) {
 
 export async function editPerson(id: string, d: Details, place?: Place): Promise<{ ok: true } | { error: string; names?: string[] }> {
   const { approved, graph } = await treeState();
-  if (!graph.byId.has(id) || id === ROSA) return { error: "not found" };
+  // Rosa's details can be corrected (a year, a place), never her place in the tree
+  if (!graph.byId.has(id) || (id === ROSA && place?.kind)) return { error: "not found" };
   const fields = details(d);
   if (fields.name !== undefined && fields.name.length < 1) return { error: "name" };
   const { main, filler } = backing(id, approved);
 
   let move: Partial<StoredPerson> | undefined;
   if (place?.kind) {
-    if (!main || !PLACES.includes(main.kind as RequestKind) || !PLACES.includes(place.kind as RequestKind)) return { error: "place" };
+    if (!main || !(PLACES.includes(main.kind as RequestKind) || main.rel) || !PLACES.includes(place.kind as RequestKind)) return { error: "place" };
     const kind = place.kind as RequestKind;
     const target = kind === "partner" ? place.partnerOf : place.parentId;
     const depthOf = (x?: string) => (x ? graph.depth(x) : null);
@@ -121,6 +124,9 @@ export async function editPerson(id: string, d: Details, place?: Place): Promise
       grandparentId: undefined,
       grandparentName: undefined,
       grandparentGender: undefined,
+      rel: undefined,
+      of: undefined,
+      with: undefined,
     };
   }
 
@@ -133,7 +139,7 @@ export async function editPerson(id: string, d: Details, place?: Place): Promise
   } else {
     // a person from the starting tree, or an empty slot: the correction is kept as a filled-in entry
     const p = graph.byId.get(id)!;
-    await familyStore.create({ replaces: id, name: fields.name ?? p.name, nameAlt: fields.nameAlt ?? p.nameAlt, gender: (fields.gender ?? p.gender) as StoredPerson["gender"], born: fields.born ?? p.born, birthplace: fields.birthplace ?? p.birthplace }, [], "approved");
+    await familyStore.create({ replaces: id, name: fields.name ?? p.name, nameAlt: fields.nameAlt ?? p.nameAlt, gender: (fields.gender ?? p.gender) as StoredPerson["gender"], born: fields.born ?? p.born, died: fields.died ?? p.died, birthplace: fields.birthplace ?? p.birthplace }, [], "approved");
   }
   return { ok: true };
 }

@@ -77,6 +77,11 @@ export type StoredPerson = Base & {
   grandparentName?: string;
   grandparentGender?: "f" | "m" | "x";
   partnerOf?: string;
+  /** the general way: relation to any person in the tree (see lib/family LinkRel) */
+  rel?: "child" | "partner" | "parent" | "sibling";
+  of?: string;
+  with?: string;
+  died?: string;
 };
 
 export type NewFile = {

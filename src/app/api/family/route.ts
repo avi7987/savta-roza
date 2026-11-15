@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { family as seed } from "@/content/family";
 import type { Gender } from "@/content/types";
-import { FamilyGraph, expandRequest, mergePeople, type FamilyRequest, type RequestKind, type TreePerson } from "@/lib/family";
+import { FamilyGraph, LINK_RELS, expandRequest, mergePeople, type FamilyRequest, type LinkRel, type RequestKind, type TreePerson } from "@/lib/family";
+import { ROSA } from "@/content/family";
 import { LIMITS, maxBytes } from "@/lib/limits";
 import { rateLimited } from "@/server/auth";
 import { sniff } from "@/server/sniff";
@@ -52,8 +53,15 @@ export async function POST(req: Request) {
   const at = (id: string | undefined, depth: number) => exists(id) && graph.depth(id!) === depth;
 
   const f = (k: string, max = 80) => clean(form.get(k), max) || undefined;
-  const kind = f("kind", 20) as RequestKind | undefined;
+  let kind = f("kind", 20) as RequestKind | undefined;
   const replaces = f("replaces");
+  let rel = f("rel", 10) as LinkRel | undefined;
+  const of = f("of");
+  // Rosa's parents and siblings keep their fixed places in the tree
+  if (!replaces && of === ROSA && (rel === "parent" || rel === "sibling")) {
+    kind = rel;
+    rel = undefined;
+  }
   const r: Omit<StoredPerson, "id" | "status" | "files" | "createdAt"> = {
     kind: replaces ? undefined : kind,
     replaces,
@@ -70,6 +78,10 @@ export async function POST(req: Request) {
     grandparentName: f("grandparentName", LIMITS.name),
     grandparentGender: gender(clean(form.get("grandparentGender"), 1)),
     partnerOf: f("partnerOf"),
+    rel: replaces ? undefined : rel,
+    of: replaces || !rel ? undefined : of,
+    with: replaces || rel !== "child" ? undefined : f("with"),
+    died: f("died", 20),
   };
 
   const errors: string[] = [];
@@ -78,6 +90,12 @@ export async function POST(req: Request) {
   // every id a request points to must already be in the tree, at the right generation
   if (replaces) {
     if (!exists(replaces)) errors.push("to");
+  } else if (r.rel) {
+    // the general way: the person it is linked to must be in the tree
+    const target = r.of && graph.byId.get(r.of);
+    if (!LINK_RELS.includes(r.rel) || !target || target.virtual) errors.push("to");
+    else if (r.rel === "child" && r.with && !graph.partnersOf(r.of!).includes(r.with)) errors.push("to");
+    else if (r.rel === "parent" && graph.realParentsOf(r.of!).length >= 2) errors.push("to");
   } else if (!kind || !KINDS.includes(kind)) errors.push("kind");
   else if (kind === "grandchild" && r.parentId && !at(r.parentId, 1)) errors.push("to");
   else if (kind === "great" && r.parentId && !at(r.parentId, 2)) errors.push("to");

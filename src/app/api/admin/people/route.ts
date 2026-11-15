@@ -34,7 +34,7 @@ export async function GET(req: Request) {
   const people = [
     ...dir.graph.people
       .filter((p) => !p.placeholder && p.name)
-      .map((p) => ({ id: p.id, name: p.name, nameAlt: p.nameAlt, gender: p.gender, born: p.born, birthplace: p.birthplace, inTree: true, photo: p.photoSrc, tree: info[p.id] })),
+      .map((p) => ({ id: p.id, name: p.name, nameAlt: p.nameAlt, gender: p.gender, born: p.born, died: p.died, birthplace: p.birthplace, inTree: true, photo: p.photoSrc, tree: info[p.id] })),
     ...dir.listed.map((n) => ({ id: n.id, name: n.name, inTree: false })),
   ].map((p) => ({ ...p, ...(uses.get(p.id) ?? { photos: 0, memories: 0, thumbs: [] }) }));
   return json({ people });

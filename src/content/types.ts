@@ -61,6 +61,12 @@ export type Person = {
   gender?: Gender;
   parents?: string[];
   partnerId?: string;
+  /** more partners (a second marriage, a late husband…), beyond partnerId */
+  partners?: string[];
+  /** children this person was added as a parent of (the link is kept on the parent) */
+  children?: string[];
+  /** added as a brother or sister of this person: shares their parents, known or not */
+  siblingOf?: string;
   /** optional full details, shown only when the person chose to add them */
   born?: string;
   birthplace?: string;
@@ -68,6 +74,8 @@ export type Person = {
   about?: string;
   photoSrc?: string;
   placeholder?: boolean;
+  /** a parent nobody has named yet, implied by siblings who share them; never drawn as a card */
+  virtual?: boolean;
 };
 
 export type StoryBlock =

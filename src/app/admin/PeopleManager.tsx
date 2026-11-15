@@ -9,7 +9,7 @@ import { ui } from "@/i18n/ui";
 import type { RelKey } from "@/lib/family";
 
 type Tree = { relation: RelKey; parentId?: string; partnerId?: string; editable: boolean; movable: boolean; deletable: boolean; blockers: string[] };
-type P = { id: string; name: string; nameAlt?: string; gender?: "f" | "m" | "x"; born?: string; birthplace?: string; inTree: boolean; photo?: string; photos: number; memories: number; thumbs: string[]; tree?: Tree };
+type P = { id: string; name: string; nameAlt?: string; gender?: "f" | "m" | "x"; born?: string; died?: string; birthplace?: string; inTree: boolean; photo?: string; photos: number; memories: number; thumbs: string[]; tree?: Tree };
 const REL = ui.he.family.rel;
 const relOf = (p: P) => (p.tree ? REL[p.tree.relation][p.gender ?? "x"] : "");
 
@@ -36,7 +36,7 @@ const ERRORS: Record<string, string> = {
 
 /** fix a tree person's details and, when it came in as a request, their place in the tree */
 function TreeEdit({ p, people, busy, onSave, onCancel }: { p: P; people: P[]; busy: boolean; onSave: (details: object, place?: object) => void; onCancel: () => void }) {
-  const [f, setF] = useState({ name: p.name, nameAlt: p.nameAlt ?? "", gender: p.gender ?? "x", born: p.born ?? "", birthplace: p.birthplace ?? "" });
+  const [f, setF] = useState({ name: p.name, nameAlt: p.nameAlt ?? "", gender: p.gender ?? "x", born: p.born ?? "", died: p.died ?? "", birthplace: p.birthplace ?? "" });
   const was = currentPlace(p.tree?.relation);
   const [kind, setKind] = useState<PlaceKind | "">(was);
   const [target, setTarget] = useState((was === "partner" ? p.tree?.partnerId : p.tree?.parentId) ?? "");
@@ -84,6 +84,10 @@ function TreeEdit({ p, people, busy, onSave, onCancel }: { p: P; people: P[]; bu
           <input value={f.born} onChange={(e) => setF({ ...f, born: e.target.value })} maxLength={20} inputMode="numeric" className={field} />
         </label>
         <label className="flex flex-col gap-1">
+          שנת פטירה
+          <input value={f.died} onChange={(e) => setF({ ...f, died: e.target.value })} maxLength={20} inputMode="numeric" className={field} />
+        </label>
+        <label className="flex flex-col gap-1 col-span-2">
           מקום לידה
           <input value={f.birthplace} onChange={(e) => setF({ ...f, birthplace: e.target.value })} maxLength={80} className={field} />
         </label>
