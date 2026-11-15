@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pencil, Plus, UserPlus, X } from "lucide-react";
 import { ROSA } from "@/content/family";
 import type { Photo } from "@/content/types";
-import { photosOf, photosTogether } from "@/lib/family";
+import { chainToRosa, photosOf, photosTogether } from "@/lib/family";
 import { useLang } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
 import ArchivalImage from "../ArchivalImage";
@@ -81,6 +81,8 @@ function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: str
   ];
   const branch = fam.graph.branchRoot(id);
   const name = cap(fam.nameOf(id));
+  // how this person is connected to Rosa: רוזה ← דנה ← שירה
+  const chain = chainToRosa(fam.graph, id);
   const together = id === ROSA ? [] : photosTogether(fam.photos, id);
   const all = photosOf(fam.photos, id);
   const alt = lang === "ru" ? (p.nameAlt ? p.name : undefined) : p.nameAlt;
@@ -106,13 +108,14 @@ function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: str
         aria-modal="true"
         aria-label={name}
         data-lenis-prevent
-        initial={{ x: "var(--from)", opacity: 0.6 }}
-        animate={{ x: 0, opacity: 1 }}
-        exit={{ x: "var(--from)", opacity: 0 }}
-        transition={{ duration: 0.55, ease }}
-        className="fixed inset-y-0 end-0 z-[85] flex w-full max-w-[30rem] flex-col overflow-y-auto bg-ivory shadow-[var(--shadow-lift)] [--from:100%] rtl:[--from:-100%]"
+        initial={{ x: "var(--from-x)", y: "var(--from-y)", opacity: 0.6 }}
+        animate={{ x: 0, y: 0, opacity: 1 }}
+        exit={{ x: "var(--from-x)", y: "var(--from-y)", opacity: 0 }}
+        transition={{ duration: 0.45, ease }}
+        className="fixed inset-x-0 bottom-0 top-[12svh] z-[85] flex w-full flex-col overflow-y-auto rounded-t-[22px] bg-ivory shadow-[var(--shadow-lift)] [--from-x:0%] [--from-y:100%] md:inset-x-auto md:end-0 md:top-0 md:max-w-[28rem] md:rounded-none md:[--from-x:100%] md:[--from-y:0%] md:rtl:[--from-x:-100%]"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
+        <span aria-hidden className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-line md:hidden" />
         <div className="flex justify-end p-3">
           <button ref={closeRef} type="button" onClick={onClose} aria-label={t.family.close} className="flex h-11 w-11 items-center justify-center rounded-full text-burgundy hover:bg-blush/50">
             <X className="h-5 w-5" strokeWidth={1.4} aria-hidden />
@@ -129,6 +132,23 @@ function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: str
             </span>
             {p.pending && <PendingMark />}
             {p.placeholder && !p.pending && <PlaceholderTag />}
+            {chain.length > 1 && (
+              <nav aria-label={t.family.map.chain} className="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[0.88rem]">
+                {chain.map((x, i) => (
+                  <span key={x} className="flex items-center gap-1.5">
+                    {i > 0 && <span aria-hidden className="text-rose">{lang === "he" ? "←" : "→"}</span>}
+                    <button
+                      type="button"
+                      onClick={() => x !== id && onSwitch(x)}
+                      aria-current={x === id ? "true" : undefined}
+                      className={cn("min-h-9 rounded-full px-3", x === ROSA ? "bg-rose text-white" : x === id ? "bg-blush/70 text-burgundy" : "bg-mount text-charcoal hover:bg-blush/50")}
+                    >
+                      {cap(fam.nameOf(x))}
+                    </button>
+                  </span>
+                ))}
+              </nav>
+            )}
           </header>
 
           {(facts.length > 0 || p.about) && (
@@ -157,7 +177,7 @@ function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: str
                             <PersonAvatar person={g.byId.get(x)!} label={fam.nameOf(x)} className="w-9 text-[0.72rem]" />
                             <span className="flex flex-col text-start leading-tight">
                               <span className="text-[0.92rem]">{cap(fam.nameOf(x))}</span>
-                              {x !== ROSA && <span className="text-[0.72rem] text-ink-soft">{fam.relLabel(x)}</span>}
+                              {x !== ROSA && !g.byId.get(x)?.placeholder && <span className="text-[0.72rem] text-ink-soft">{fam.relLabel(x)}</span>}
                             </span>
                           </button>
                         </li>

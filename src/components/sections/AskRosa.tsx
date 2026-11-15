@@ -69,7 +69,7 @@ export default function AskRosa() {
             />
             {!q && (
               <AnimatePresence mode="wait">
-                <motion.span key={hint} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.4 }} aria-hidden className="pointer-events-none absolute inset-y-0 start-0 flex items-center truncate text-[1.1rem] text-ink-soft/70 sm:text-[1.2rem]">
+                <motion.span key={hint} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.4 }} aria-hidden className="pointer-events-none absolute inset-y-0 start-0 flex items-center truncate text-[1.1rem] text-ink-soft sm:text-[1.2rem]">
                   {s.suggestions[hint]}
                 </motion.span>
               </AnimatePresence>

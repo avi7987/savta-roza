@@ -111,7 +111,7 @@ function Decade({ decade, photos, note, facts, index }: { decade: number; photos
           </TLink>
         )}
         {facts.length > 0 && (
-          <section aria-label={t.story.known} className="mt-2 flex flex-col gap-2 border-s-2 border-sage/50 ps-4">
+          <section aria-label={`${t.story.known} · ${label}`} className="mt-2 flex flex-col gap-2 border-s-2 border-sage/50 ps-4">
             <h4 className="label !text-sage-deep">{t.story.known}</h4>
             <ul className="flex flex-col gap-1.5">
               {facts.map((f) => (

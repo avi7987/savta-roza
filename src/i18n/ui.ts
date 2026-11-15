@@ -3,6 +3,7 @@ import type { CategoryId, Confidence, Lang } from "@/content/types";
 const he = {
   langName: "עברית",
   skip: "דילוג לתוכן",
+  tabs: { label: "ניווט מהיר", story: "הסיפור", album: "האלבום", add: "הוספה", family: "המשפחה", ask: "שאלו" },
   nav: { home: "בית", story: "סיפור החיים", family: "המשפחה", timeline: "ציר החיים", gallery: "האלבום", memories: "זיכרונות", share: "הוספת זיכרון", menu: "תפריט", close: "סגירה", language: "שפה" },
   placeholder: "מקום שמור · ממתין לתוכן מהמשפחה",
   placeholderShort: "ממתין לתוכן",
@@ -236,6 +237,11 @@ const he = {
       add: "הוספה",
       nobody: "אין עדיין",
       hint: "גוררים כדי לזוז, גלגלת או צביטה כדי להתקרב",
+      chain: "הקשר לרוזה",
+      branches: "הענפים של המשפחה",
+      people: (n: number) => `${n} אנשים`,
+      grandkids: (n: number) => (n === 1 ? "נכד אחד" : `${n} נכדים`),
+      greats: (n: number) => (n === 1 ? "נין אחד" : `${n} נינים`),
     },
     form2: {
       steps: ["ליד מי", "הקשר", "פרטים", "תמונה", "שליחה"],
@@ -423,6 +429,7 @@ export type UI = typeof he;
 const ru: UI = {
   langName: "Русский",
   skip: "Перейти к содержанию",
+  tabs: { label: "Быстрая навигация", story: "История", album: "Альбом", add: "Добавить", family: "Семья", ask: "Спросить" },
   nav: { home: "Главная", story: "История жизни", family: "Семья", timeline: "Жизненный путь", gallery: "Альбом", memories: "Воспоминания", share: "Добавить воспоминание", menu: "Меню", close: "Закрыть", language: "Язык" },
   placeholder: "Место для материалов от семьи",
   placeholderShort: "Ждёт материалов",
@@ -656,6 +663,11 @@ const ru: UI = {
       add: "Добавить",
       nobody: "Пока никого",
       hint: "Перетаскивайте, чтобы двигаться; колесо или щипок, чтобы приблизить",
+      chain: "Связь с Розой",
+      branches: "Ветви семьи",
+      people: (n: number) => `${n} чел.`,
+      grandkids: (n: number) => `внуков: ${n}`,
+      greats: (n: number) => `правнуков: ${n}`,
     },
     form2: {
       steps: ["Рядом с кем", "Связь", "Данные", "Фото", "Отправка"],

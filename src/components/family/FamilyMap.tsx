@@ -1,10 +1,11 @@
 "use client";
 
 import "@xyflow/react/dist/style.css";
-import { ReactFlow, ReactFlowProvider, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
+import { MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Maximize2, Minus, Plus, RotateCcw, Search } from "lucide-react";
 import { ROSA } from "@/content/family";
+import { chainToRosa } from "@/lib/family";
 import { layoutFamily, type FamilyLayout } from "@/lib/familyLayout";
 import { useLang } from "@/lib/i18n";
 import { nameScore } from "@/lib/names";
@@ -12,7 +13,9 @@ import PersonCard, { CARD_H, CARD_W, type CardState } from "./PersonCard";
 import type { useFamily } from "./useFamily";
 
 type Fam = ReturnType<typeof useFamily>;
-const LAYOUT = { cardW: CARD_W, cardH: CARD_H, gap: 26, coupleGap: 30, rowGap: 78 };
+const LAYOUT = { cardW: CARD_W, cardH: CARD_H, gap: 26, coupleGap: 32, rowGap: 96 };
+/** room on the reading side for the names of the generations */
+const BAND = 150;
 
 /** the people closest to someone: parents, partners, brothers and sisters, children */
 export function immediateFamily(fam: Fam, id: string) {
@@ -21,7 +24,7 @@ export function immediateFamily(fam: Fam, id: string) {
 }
 
 type PersonData = { id: string; state: CardState; onOpen: (id: string) => void; onAdd: (id: string) => void; fold?: { folded: boolean; hidden: number; toggle: () => void }; fam: Fam };
-type LinesData = { layout: FamilyLayout; lit: Set<string> | null; fam: Fam };
+type LinesData = { layout: FamilyLayout; lit: Set<string> | null; path: string[]; fam: Fam; labels: { y: number; text: string }[]; rtl: boolean };
 
 const PersonNode = memo(function PersonNode({ data }: NodeProps<Node<PersonData>>) {
   const { fam, id } = data;
@@ -33,33 +36,53 @@ const PersonNode = memo(function PersonNode({ data }: NodeProps<Node<PersonData>
   );
 });
 
-/** all the lines in one drawing, underneath the cards */
+/** all the lines in one drawing, underneath the cards, with the generations named at the side */
 const LinesNode = memo(function LinesNode({ data }: NodeProps<Node<LinesData>>) {
-  const { layout, lit, fam } = data;
-  const on = (people: string[]) => {
+  const { layout, lit, path, fam, labels, rtl } = data;
+  const virtual = (p: string) => !!fam.graph.byId.get(p)?.virtual;
+  // a line is on the way to Rosa when it joins two neighbours in the chain
+  const steps = new Set(path.slice(1).map((p, i) => [p, path[i]].sort().join("|")));
+  const onPath = (people: string[]) => {
+    const real = people.filter((p) => !virtual(p));
+    const last = real[real.length - 1];
+    return real.slice(0, -1).some((p) => steps.has([p, last].sort().join("|"))) || (real.length === 2 && steps.has([...real].sort().join("|")));
+  };
+  const inFamily = (people: string[]) => {
     if (!lit) return null;
-    const real = people.filter((p) => !fam.graph.byId.get(p)?.virtual);
+    const real = people.filter((p) => !virtual(p));
     return real.length > 0 && real.every((p) => lit.has(p));
   };
+  const w = layout.width + BAND;
+  const x0 = rtl ? 0 : -BAND;
   return (
     <svg width={layout.width} height={layout.height} className="pointer-events-none overflow-visible" aria-hidden>
+      {labels.map((b) => (
+        <g key={b.y}>
+          <line x1={x0} x2={x0 + w} y1={b.y - 48} y2={b.y - 48} stroke="var(--color-rail)" strokeDasharray="2 6" strokeOpacity={0.7} />
+          <text x={rtl ? layout.width + BAND - 8 : -BAND + 8} y={b.y - 26} textAnchor={rtl ? "end" : "start"} fontSize={13} letterSpacing={0.6} fill="var(--color-ink-soft)" style={{ fontFamily: "var(--font-sans)" }}>
+            {b.text}
+          </text>
+        </g>
+      ))}
       {layout.connectors.map((c) => {
-        const state = on(c.people);
+        const route = path.length > 1 && onPath(c.people);
+        const fam_ = inFamily(c.people);
         return (
           <path
             key={c.id}
             d={c.d}
             fill="none"
-            stroke={state ? "var(--color-burgundy)" : c.kind === "couple" ? "var(--color-rose)" : "#b9a69c"}
-            strokeWidth={state ? 2.4 : c.kind === "couple" ? 2 : 1.6}
-            strokeOpacity={state === false ? 0.25 : 1}
+            stroke={route ? "var(--color-rose)" : fam_ ? "var(--color-dusty)" : c.kind === "couple" ? "var(--color-dusty)" : "var(--color-rail)"}
+            strokeWidth={route ? 3.2 : fam_ ? 2.2 : c.kind === "couple" ? 2 : 1.7}
+            strokeOpacity={lit && !route && !fam_ ? 0.3 : 1}
             strokeLinejoin="round"
+            strokeLinecap="round"
             style={{ transition: "stroke 0.3s, stroke-opacity 0.3s, stroke-width 0.3s" }}
           />
         );
       })}
       {layout.junctions.map((j) => (
-        <circle key={j.id} cx={j.x} cy={j.y} r={5} fill="#fff" stroke="#b9a69c" strokeWidth={1.6} strokeDasharray="2 2" />
+        <circle key={j.id} cx={j.x} cy={j.y} r={5} fill="var(--color-paper)" stroke="var(--color-rail)" strokeWidth={1.6} strokeDasharray="2 2" />
       ))}
     </svg>
   );
@@ -79,7 +102,9 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
 
   const layout = useMemo(() => layoutFamily(fam.graph, { ...LAYOUT, rtl: dir === "rtl", collapsed }), [fam.graph, dir, collapsed]);
   const at = useMemo(() => new Map(layout.cards.map((c) => [c.id, c])), [layout]);
-  const lit = useMemo(() => (selected && at.has(selected) ? immediateFamily(fam, selected) : null), [fam, selected, at]);
+  const path = useMemo(() => (selected && at.has(selected) ? chainToRosa(fam.graph, selected) : []), [fam, selected, at]);
+  const lit = useMemo(() => (selected && at.has(selected) ? new Set([...immediateFamily(fam, selected), ...path]) : null), [fam, selected, at, path]);
+  const labels = useMemo(() => layout.rows.map((r) => ({ y: r.y, text: m.gen(r.level) })), [layout, m]);
 
   const toggle = useCallback((id: string) => setCollapsed((cur) => {
     const next = new Set(cur);
@@ -94,7 +119,7 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
   }, [onOpen]);
 
   const nodes = useMemo<Node[]>(() => {
-    const list: Node[] = [{ id: "__lines", type: "lines", position: { x: 0, y: 0 }, data: { layout, lit, fam }, draggable: false, selectable: false, focusable: false, zIndex: 0, width: layout.width, height: layout.height, style: { pointerEvents: "none" } }];
+    const list: Node[] = [{ id: "__lines", type: "lines", position: { x: 0, y: 0 }, data: { layout, lit, path, fam, labels, rtl: dir === "rtl" }, draggable: false, selectable: false, focusable: false, zIndex: 0, width: layout.width, height: layout.height, style: { pointerEvents: "none" } }];
     for (const c of layout.cards) {
       const hasKids = fam.graph.childrenOf(c.id).length > 0 || c.hidden > 0;
       list.push({
@@ -111,7 +136,7 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
         data: {
           id: c.id,
           fam,
-          state: !lit ? "normal" : c.id === selected ? "selected" : lit.has(c.id) ? "lit" : "dim",
+          state: !lit ? "normal" : c.id === selected ? "selected" : path.includes(c.id) ? "path" : lit.has(c.id) ? "lit" : "dim",
           onOpen: open,
           onAdd,
           fold: hasKids && c.id !== ROSA ? { folded: collapsed.has(c.id), hidden: c.hidden, toggle: () => toggle(c.id) } : undefined,
@@ -119,7 +144,7 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
       });
     }
     return list;
-  }, [layout, lit, fam, selected, open, onAdd, collapsed, toggle]);
+  }, [layout, lit, path, labels, dir, fam, selected, open, onAdd, collapsed, toggle]);
 
   const centerOn = useCallback(
     (id: string, zoom?: number) => {
@@ -189,7 +214,20 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
         onInit={() => setInited(true)}
         proOptions={{ hideAttribution: true }}
         className="[&_.react-flow__node]:cursor-default"
-      />
+      >
+        {layout.cards.length > 40 && (
+          <MiniMap
+            position="bottom-left"
+            pannable
+            zoomable
+            ariaLabel={m.fit}
+            nodeColor={(n) => (n.id === ROSA ? "var(--color-rose)" : n.type === "lines" ? "transparent" : "var(--color-rail)")}
+            nodeStrokeWidth={0}
+            maskColor="rgba(248,242,237,0.7)"
+            style={{ width: 150, height: 96, borderRadius: 12, border: "1px solid var(--color-line)", background: "var(--color-paper)" }}
+          />
+        )}
+      </ReactFlow>
 
       {/* toolbar */}
       <div dir={dir} className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-2">

@@ -331,3 +331,29 @@ export function pathToRosa(g: FamilyGraph, id: string) {
   path.add(ROSA);
   return path;
 }
+
+/**
+ * How someone is connected to Rosa, as a chain from Rosa to them (Rosa first): the shortest way
+ * through parents, children and partners. Works for in-laws, Rosa's own parents and siblings, and
+ * the families of people who married in.
+ */
+export function chainToRosa(g: FamilyGraph, id: string): string[] {
+  if (id === ROSA) return [ROSA];
+  const prev = new Map<string, string | null>([[ROSA, null]]);
+  const queue = [ROSA];
+  while (queue.length) {
+    const cur = queue.shift()!;
+    if (cur === id) break;
+    // children first, so the chain follows the family down before it goes sideways
+    for (const next of [...g.childrenOf(cur), ...g.partnersOf(cur), ...g.parentsOf(cur)]) {
+      if (prev.has(next)) continue;
+      prev.set(next, cur);
+      queue.push(next);
+    }
+  }
+  if (!prev.has(id)) return [];
+  const chain: string[] = [];
+  for (let c: string | null | undefined = id; c; c = prev.get(c)) chain.unshift(c);
+  // unnamed parents (a junction, not a person) are left out of the chain
+  return chain.filter((x) => !g.byId.get(x)?.virtual);
+}

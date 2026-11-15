@@ -176,7 +176,7 @@ function Browser() {
         </Container>
         <TLink
           href="/share"
-          className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] left-1/2 z-30 inline-flex min-h-12 -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-burgundy px-6 text-[1rem] text-white shadow-[0_8px_24px_-6px_rgba(90,30,50,0.45)] transition-transform hover:-translate-y-0.5 sm:bottom-8 sm:left-auto sm:end-8 sm:translate-x-0"
+          className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] left-1/2 z-30 hidden min-h-12 -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full bg-burgundy md:inline-flex px-6 text-[1rem] text-white shadow-[0_8px_24px_-6px_rgba(90,30,50,0.45)] transition-transform hover:-translate-y-0.5 sm:bottom-8 sm:left-auto sm:end-8 sm:translate-x-0"
         >
           <ImagePlus className="h-5 w-5" strokeWidth={1.6} aria-hidden />
           {t.album.add}

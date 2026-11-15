@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
@@ -48,7 +49,7 @@ export function LanguageSwitcher({ className, large }: { className?: string; lar
 const LINKS = [
   { id: "story", key: "story", href: "/#story" },
   { id: "gallery", key: "gallery", href: "/gallery" },
-  { id: "family", key: "family", href: "/#family" },
+  { id: "family", key: "family", href: "/family" },
 ] as const;
 
 export default function Header() {
@@ -93,7 +94,8 @@ export default function Header() {
     return () => window.removeEventListener("keydown", esc);
   }, [open]);
 
-  const navActive = (id: string) => active === id || (id === "story" && active === "timeline") || (id === "gallery" && active === "media") || (id === "memories" && (active === "letters" || active === "contribute"));
+  const pathname = usePathname();
+  const navActive = (id: string) => (id === "family" && pathname.startsWith("/family")) || active === id || (id === "story" && active === "timeline") || (id === "gallery" && active === "media") || (id === "memories" && (active === "letters" || active === "contribute"));
 
   return (
     <>

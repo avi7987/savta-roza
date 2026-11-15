@@ -31,8 +31,9 @@ export default function PersonAvatar({ person, label, className, center }: { per
     <span
       aria-hidden
       className={cn(
-        "flex aspect-square items-center justify-center rounded-full font-display text-white shadow-[var(--shadow-paper)] ring-2 ring-white",
-        center ? "bg-burgundy text-[1.6em]" : "bg-rose text-[1.15em]",
+        // a soft initial on blush paper: the family's photos are what should stand out
+        "flex aspect-square items-center justify-center rounded-full font-display shadow-[0_0_0_3px_var(--color-paper),0_0_0_4px_var(--color-line)]",
+        center ? "bg-burgundy text-[1.6em] text-white" : "bg-blush/80 text-[1.15em] text-burgundy",
         className
       )}
     >

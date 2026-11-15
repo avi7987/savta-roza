@@ -4,6 +4,7 @@ import Lenis from "lenis";
 import { MotionConfig } from "motion/react";
 import { useEffect, type ReactNode } from "react";
 import { LangProvider } from "@/lib/i18n";
+import PhoneTabs from "./PhoneTabs";
 import { TransitionProvider } from "./Transition";
 
 /** Gentle smooth scrolling; switched off entirely for visitors who prefer reduced motion. */
@@ -32,7 +33,9 @@ export default function Shell({ children }: { children: ReactNode }) {
       <MotionConfig reducedMotion="user">
         <TransitionProvider>
           <SmoothScroll />
-          {children}
+          {/* room at the bottom of every phone page for the tab bar */}
+          <div className="pb-[calc(3.75rem+env(safe-area-inset-bottom,0px))] md:pb-0">{children}</div>
+          <PhoneTabs />
         </TransitionProvider>
       </MotionConfig>
     </LangProvider>

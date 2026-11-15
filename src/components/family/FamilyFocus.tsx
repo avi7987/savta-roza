@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useState, type ReactNode } from "react";
-import { ArrowRight, Images, Plus } from "lucide-react";
+import { ArrowRight, ChevronLeft, Images, Plus } from "lucide-react";
 import { ROSA } from "@/content/family";
 import { pathToRosa } from "@/lib/family";
 import { useLang } from "@/lib/i18n";
@@ -20,7 +20,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
  * moves to them, and the trail at the top leads back.
  */
 export default function FamilyFocus({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void; onAdd: (id: string) => void }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const m = t.family.map;
   const g = fam.graph;
   const [focus, setFocus] = useState(ROSA);
@@ -54,6 +54,17 @@ export default function FamilyFocus({ fam, onOpen, onAdd }: { fam: Fam; onOpen: 
     const other = g.parentsOf(k).find((x) => x !== focus && partners.includes(x)) ?? (partners.length === 1 && g.parentsOf(k).length === 1 ? partners[0] : "");
     groups.set(other, [...(groups.get(other) ?? []), k]);
   }
+
+  // everyone below someone, for the size of a branch
+  const descendants = (id: string, seen = new Set<string>()): string[] => {
+    for (const c of g.childrenOf(id)) {
+      if (seen.has(c)) continue;
+      seen.add(c);
+      descendants(c, seen);
+    }
+    return [...seen];
+  };
+  const byDepth = (ids: string[], d: number) => ids.filter((x) => g.depth(x) === d).length;
 
   const card = (id: string, state: "selected" | "normal" = "normal") => {
     const person = g.byId.get(id)!;
@@ -118,7 +129,35 @@ export default function FamilyFocus({ fam, onOpen, onAdd }: { fam: Fam; onOpen: 
               <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1">{siblings.map((x) => <div key={x} className="w-[46%] shrink-0">{card(x)}</div>)}</div>
             )}
 
-          {section(
+          {focus === ROSA && kids.length > 0 && (
+            <section className="flex flex-col gap-2.5">
+              <h4 className="label">{m.branches}</h4>
+              <ul className="flex flex-col gap-2.5">
+                {kids.map((k) => {
+                  const desc = descendants(k);
+                  const partner = g.partnersOf(k).find((x) => !g.byId.get(x)?.virtual);
+                  const counts = [desc.length && m.people(desc.length + 1), byDepth(desc, 2) && m.grandkids(byDepth(desc, 2)), byDepth(desc, 3) && m.greats(byDepth(desc, 3))].filter(Boolean).join(" · ");
+                  return (
+                    <li key={k}>
+                      <button type="button" onClick={() => go(k)} className="flex min-h-16 w-full items-center gap-3 rounded-[14px] border border-line bg-paper p-3 text-start shadow-[0_1px_2px_rgba(70,35,45,0.06)]">
+                        <span aria-hidden className="h-10 w-1 shrink-0 rounded-full bg-rose/60" />
+                        <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                          <span className="font-display text-[1.1rem] text-burgundy">
+                            {cap(fam.nameOf(k))}
+                            {partner ? ` ${lang === "he" ? "ו" : "и "}${cap(fam.nameOf(partner))}` : ""}
+                          </span>
+                          <span className="mt-0.5 text-[0.8rem] text-ink-soft">{counts || m.nobody}</span>
+                        </span>
+                        <ChevronLeft className="h-5 w-5 shrink-0 text-rose ltr:rotate-180" aria-hidden />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          {focus !== ROSA && section(
             m.children,
             kids.length ? (
               <div className="flex flex-col gap-4">
