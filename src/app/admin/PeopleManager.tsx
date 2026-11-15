@@ -5,8 +5,130 @@ import { GitMerge, Pencil, Search, Trash2 } from "lucide-react";
 import { nameScore } from "@/lib/names";
 import { cn } from "@/components/ui";
 import { refreshNames } from "@/components/people/PeoplePicker";
+import { ui } from "@/i18n/ui";
+import type { RelKey } from "@/lib/family";
 
-type P = { id: string; name: string; nameAlt?: string; inTree: boolean; photo?: string; photos: number; memories: number; thumbs: string[] };
+type Tree = { relation: RelKey; parentId?: string; partnerId?: string; editable: boolean; movable: boolean; deletable: boolean; blockers: string[] };
+type P = { id: string; name: string; nameAlt?: string; gender?: "f" | "m" | "x"; born?: string; birthplace?: string; inTree: boolean; photo?: string; photos: number; memories: number; thumbs: string[]; tree?: Tree };
+const REL = ui.he.family.rel;
+const relOf = (p: P) => (p.tree ? REL[p.tree.relation][p.gender ?? "x"] : "");
+
+/** where someone can be put in the tree, as seen from Rosa */
+const PLACES = [
+  ["child", "בן / בת של רוזה"],
+  ["grandchild", "נכד / נכדה"],
+  ["great", "נין / נינה"],
+  ["partner", "בן / בת זוג של…"],
+  ["sibling", "אח / אחות של רוזה"],
+] as const;
+type PlaceKind = (typeof PLACES)[number][0];
+const currentPlace = (r?: RelKey): PlaceKind | "" => (r === "child" || r === "grandchild" || r === "great" || r === "sibling" ? r : r === "partner" || r === "childInLaw" ? "partner" : "");
+
+const ERRORS: Record<string, string> = {
+  parent: "צריך לבחור הורה מתאים מהרשימה.",
+  partner: "צריך לבחור עם מי.",
+  cycle: "אי אפשר לשים מישהו מתחת לצאצא של עצמו.",
+  slots: "אי אפשר להעביר: אחרים בעץ תלויים בהורה שנוצר יחד איתו",
+  dependents: "לפני שמוחקים, צריך להעביר או למחוק את מי שתלוי בו בעץ",
+  name: "צריך שם.",
+  fixed: "את האדם הזה אי אפשר למחוק.",
+};
+
+/** fix a tree person's details and, when it came in as a request, their place in the tree */
+function TreeEdit({ p, people, busy, onSave, onCancel }: { p: P; people: P[]; busy: boolean; onSave: (details: object, place?: object) => void; onCancel: () => void }) {
+  const [f, setF] = useState({ name: p.name, nameAlt: p.nameAlt ?? "", gender: p.gender ?? "x", born: p.born ?? "", birthplace: p.birthplace ?? "" });
+  const was = currentPlace(p.tree?.relation);
+  const [kind, setKind] = useState<PlaceKind | "">(was);
+  const [target, setTarget] = useState((was === "partner" ? p.tree?.partnerId : p.tree?.parentId) ?? "");
+  const tree = people.filter((x) => x.inTree && x.id !== p.id && x.tree);
+  const options =
+    kind === "grandchild" ? tree.filter((x) => x.tree!.relation === "child") : kind === "great" ? tree.filter((x) => x.tree!.relation === "grandchild" || x.tree!.relation === "great") : kind === "partner" ? tree.filter((x) => x.tree!.relation !== "parent") : [];
+  const needsTarget = kind === "grandchild" || kind === "great" || kind === "partner";
+  const placeChanged = !!p.tree?.movable && !!kind && (kind !== was || (needsTarget && target !== ((was === "partner" ? p.tree?.partnerId : p.tree?.parentId) ?? "")));
+  const field = "w-full rounded-md border border-charcoal/20 bg-white px-3 py-2";
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(f, placeChanged ? { kind, parentId: kind !== "partner" ? target : undefined, partnerOf: kind === "partner" ? target : undefined } : undefined);
+      }}
+      className="mt-3 grid gap-4 rounded-md bg-ivory p-4 sm:grid-cols-2"
+    >
+      <label className="flex flex-col gap-1">
+        שם
+        <input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} maxLength={80} required className={field} />
+      </label>
+      <label className="flex flex-col gap-1">
+        שם ברוסית (לא חובה)
+        <input value={f.nameAlt} onChange={(e) => setF({ ...f, nameAlt: e.target.value })} maxLength={80} dir="auto" className={field} />
+      </label>
+      <fieldset className="flex flex-col gap-1">
+        <legend>מין</legend>
+        <div className="flex gap-2">
+          {(
+            [
+              ["f", "אישה"],
+              ["m", "גבר"],
+              ["x", "לא לציין"],
+            ] as const
+          ).map(([g, l]) => (
+            <button key={g} type="button" aria-pressed={f.gender === g} onClick={() => setF({ ...f, gender: g })} className={cn("min-h-10 rounded-full px-4", f.gender === g ? "bg-burgundy text-white" : "border border-charcoal/20 bg-white")}>
+              {l}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1">
+          שנת לידה
+          <input value={f.born} onChange={(e) => setF({ ...f, born: e.target.value })} maxLength={20} inputMode="numeric" className={field} />
+        </label>
+        <label className="flex flex-col gap-1">
+          מקום לידה
+          <input value={f.birthplace} onChange={(e) => setF({ ...f, birthplace: e.target.value })} maxLength={80} className={field} />
+        </label>
+      </div>
+
+      {p.tree?.movable ? (
+        <fieldset className="flex flex-col gap-2 sm:col-span-2">
+          <legend className="mb-1">המקום בעץ</legend>
+          <div className="flex flex-wrap gap-2">
+            {PLACES.map(([k, l]) => (
+              <button key={k} type="button" aria-pressed={kind === k} onClick={() => (setKind(k), setTarget(""))} className={cn("min-h-10 rounded-full px-4", kind === k ? "bg-burgundy text-white" : "border border-charcoal/20 bg-white")}>
+                {l}
+              </button>
+            ))}
+          </div>
+          {needsTarget && (
+            <label className="mt-1 flex max-w-sm flex-col gap-1">
+              {kind === "partner" ? "בן/בת הזוג של:" : kind === "grandchild" ? "הילד/ה של (מילדיה של רוזה):" : "הילד/ה של (מהנכדים):"}
+              <select value={target} onChange={(e) => setTarget(e.target.value)} required className={field}>
+                <option value="">בחירה…</option>
+                {options.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {label(o)} ({relOf(o)})
+                  </option>
+                ))}
+              </select>
+              {!options.length && <span className="text-[0.85rem] text-burgundy">אין עדיין בעץ מישהו מתאים. אפשר קודם להוסיף אותו דרך עץ המשפחה באתר.</span>}
+            </label>
+          )}
+        </fieldset>
+      ) : (
+        <p className="text-[0.88rem] text-ink-soft sm:col-span-2">את המקום של {p.name} בעץ אי אפשר להזיז מכאן (הוא חלק מהמבנה הבסיסי של העץ), אבל אפשר לתקן את הפרטים.</p>
+      )}
+
+      <div className="flex gap-2 sm:col-span-2">
+        <button type="submit" disabled={busy || (needsTarget && placeChanged && !target)} className="rounded-full bg-burgundy px-5 py-2 text-white disabled:opacity-60">
+          שמירה
+        </button>
+        <button type="button" onClick={onCancel} className="px-3 text-ink-soft">
+          ביטול
+        </button>
+      </div>
+    </form>
+  );
+}
 
 const label = (p: P) => [p.name, p.nameAlt].filter(Boolean).join(" · ");
 const usage = (p: P) => (p.photos ? `מתויג ב־${p.photos === 1 ? "תמונה אחת" : `${p.photos} תמונות`}` : p.memories ? `מתויג ב־${p.memories === 1 ? "זיכרון אחד" : `${p.memories} זיכרונות`}` : "עוד לא מתויג באף תמונה");
@@ -110,6 +232,11 @@ export default function PeopleManager({ token, onDone }: { token: string; onDone
       onDone(`כבר יש מישהו בשם הזה${other ? ` (${label(other)})` : ""}. אם זה אותו אדם, אפשר לאחד ביניהם.`);
       return false;
     }
+    if (r?.status === 422) {
+      const d = await r.json().catch(() => ({}));
+      onDone(`${ERRORS[d.error] ?? "הפעולה לא הצליחה."}${d.names?.length ? `: ${d.names.join(", ")}` : ""}`);
+      return false;
+    }
     if (!r?.ok) {
       onDone("הפעולה לא הצליחה. נסו שוב.");
       return false;
@@ -152,8 +279,8 @@ export default function PeopleManager({ token, onDone }: { token: string; onDone
   return (
     <div className="mt-8 flex flex-col gap-8">
       <p className="max-w-3xl text-ink-soft">
-        כל מי שתויג בתמונות ובזיכרונות. אנשים מעץ המשפחה מסומנים בירוק, ואת השם שלהם משנים דרך עץ המשפחה. שמות מהמאגר (מי שלא בעץ) אפשר לתקן, לאחד או למחוק כאן, וכל
-        שינוי מתעדכן מיד בכל התמונות, בזיכרונות ובחיפוש.
+        כל האנשים באתר: מי שבעץ המשפחה (בירוק) ומי שתויג בתמונות בלי להיות בעץ (בוורוד). אנשים בעץ אפשר לערוך, להעביר למקום הנכון בעץ או להסיר ממנו. שמות
+        מהמאגר אפשר לתקן, לאחד או למחוק. כל שינוי מתעדכן מיד בעץ, בתמונות, בזיכרונות ובחיפוש.
       </p>
 
       {suspects.length > 0 && (
@@ -199,7 +326,7 @@ export default function PeopleManager({ token, onDone }: { token: string; onDone
             <div className="flex flex-wrap items-center gap-3">
               <Avatar p={p} />
               <div className="flex min-w-[10rem] flex-1 flex-col leading-tight">
-                {editing === p.id ? (
+                {editing === p.id && !p.inTree ? (
                   <form
                     onSubmit={(e) => {
                       e.preventDefault();
@@ -220,7 +347,7 @@ export default function PeopleManager({ token, onDone }: { token: string; onDone
                   <span className="text-[1.05rem]">{label(p)}</span>
                 )}
                 <span className="mt-1 text-[0.85rem] text-ink-soft">
-                  <span className={cn("me-2 rounded-full px-2 py-0.5 text-[0.75rem]", p.inTree ? "bg-sage/25 text-sage-deep" : "bg-blush/50 text-burgundy")}>{p.inTree ? "עץ המשפחה" : "מאגר השמות"}</span>
+                  <span className={cn("me-2 rounded-full px-2 py-0.5 text-[0.75rem]", p.inTree ? "bg-sage/25 text-sage-deep" : "bg-blush/50 text-burgundy")}>{p.inTree ? `עץ המשפחה${relOf(p) ? ` · ${relOf(p)}` : ""}` : "מאגר השמות"}</span>
                   {usage(p)}
                 </span>
               </div>
@@ -230,6 +357,18 @@ export default function PeopleManager({ token, onDone }: { token: string; onDone
                     // eslint-disable-next-line @next/next/no-img-element
                     <img key={src} src={src} alt="" loading="lazy" className="h-11 w-11 rounded object-cover" />
                   ))}
+                </div>
+              )}
+              {p.inTree && p.tree && editing !== p.id && (
+                <div className="flex flex-wrap gap-1">
+                  <button type="button" onClick={() => (setEditing(p.id), setMerging(null), setConfirmDelete(null))} className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-charcoal hover:bg-ivory">
+                    <Pencil className="h-4 w-4" aria-hidden /> עריכה
+                  </button>
+                  {p.tree.deletable && (
+                    <button type="button" onClick={() => (setConfirmDelete(p.id), setMerging(null))} className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 text-burgundy hover:bg-blush/30">
+                      <Trash2 className="h-4 w-4" aria-hidden /> הסרה מהעץ
+                    </button>
+                  )}
                 </div>
               )}
               {!p.inTree && editing !== p.id && (
@@ -246,8 +385,32 @@ export default function PeopleManager({ token, onDone }: { token: string; onDone
                 </div>
               )}
             </div>
+            {editing === p.id && p.inTree && (
+              <TreeEdit p={p} people={people} busy={busy} onCancel={() => setEditing(null)} onSave={(details, place) => call({ action: "editTree", id: p.id, details, place }, place ? `${p.name} הועבר/ה למקום החדש בעץ.` : `הפרטים של ${p.name} עודכנו.`)} />
+            )}
             {merging === p.id && <MergeInto from={p} people={people} onCancel={() => setMerging(null)} onPick={(into) => call({ action: "merge", id: p.id, into: into.id }, `"${p.name}" אוחד עם "${into.name}".`)} />}
-            {confirmDelete === p.id && (
+            {confirmDelete === p.id && p.inTree && p.tree && (
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md bg-blush/30 p-3">
+                {p.tree.blockers.length ? (
+                  <span>
+                    אי אפשר להסיר את {p.name} עדיין: {p.tree.blockers.join(", ")} תלויים בו/בה בעץ. קודם צריך להעביר אותם למקום אחר (בעריכה) או להסיר אותם.
+                  </span>
+                ) : (
+                  <>
+                    <span>
+                      להסיר את {p.name} מעץ המשפחה? {p.photos || p.memories ? "התיוג שלו/ה יוסר מהתמונות. התמונות עצמן לא יימחקו." : ""}
+                    </span>
+                    <button type="button" disabled={busy} onClick={() => call({ action: "deleteTree", id: p.id }, `${p.name} הוסר/ה מהעץ.`)} className="rounded-full bg-burgundy px-4 py-1.5 text-white disabled:opacity-60">
+                      כן, להסיר
+                    </button>
+                  </>
+                )}
+                <button type="button" onClick={() => setConfirmDelete(null)} className="px-2 text-ink-soft">
+                  ביטול
+                </button>
+              </div>
+            )}
+            {confirmDelete === p.id && !p.inTree && (
               <div className="mt-3 flex flex-wrap items-center gap-3 rounded-md bg-blush/30 p-3">
                 <span>
                   למחוק את &quot;{p.name}&quot;? {p.photos || p.memories ? `התיוג שלו יוסר מ${p.photos ? `־${p.photos} תמונות` : `־${p.memories} זיכרונות`}. התמונות עצמן לא יימחקו.` : ""}

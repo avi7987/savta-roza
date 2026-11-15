@@ -1,40 +1,14 @@
 import { NextResponse } from "next/server";
 import { isAdmin } from "@/server/auth";
 import { NAME_PREFIX, peopleDirectory } from "@/server/people";
-import { namesStore, store, type StoredMemory } from "@/server/store";
+import { namesStore, store } from "@/server/store";
+import { deletePerson, editPerson, retagAll, treeInfo } from "@/server/treeEdit";
 import { sameName } from "@/lib/names";
 
 export const runtime = "nodejs";
 
 const json = (b: unknown, status = 200) => NextResponse.json(b, { status, headers: { "Cache-Control": "no-store" } });
 const cleanName = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001F\u007F<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 60) : "");
-
-/** every place a person can be tagged in one memory: the memory, each file, and each note on a file */
-function retag(m: StoredMemory, from: string, into: string | null): StoredMemory {
-  const swap = (list?: string[]) => {
-    if (!list?.includes(from)) return list;
-    const next = Array.from(new Set(list.map((x) => (x === from ? into : x)).filter((x): x is string => !!x)));
-    return next.length ? next : undefined;
-  };
-  return {
-    ...m,
-    people: swap(m.people),
-    files: m.files.map((f) => ({ ...f, people: swap(f.people), notes: f.notes?.map((n) => ({ ...n, people: swap(n.people) })) })),
-  };
-}
-
-const mentions = (m: StoredMemory, id: string) => !!m.people?.includes(id) || m.files.some((f) => f.people?.includes(id) || f.notes?.some((n) => n.people?.includes(id)));
-
-/** carry a change to a person through every memory and photo that tags them */
-async function retagAll(from: string, into: string | null) {
-  let changed = 0;
-  for (const m of await store.list()) {
-    if (!mentions(m, from)) continue;
-    await store.update(m.id, (cur) => retag(cur, from, into));
-    changed++;
-  }
-  return changed;
-}
 
 /** Everyone who can be tagged, with how often and where they are tagged. Owner only. */
 export async function GET(req: Request) {
@@ -56,8 +30,11 @@ export async function GET(req: Request) {
     }
     inMemory.forEach((id) => bump(id).memories++);
   }
+  const { info } = await treeInfo();
   const people = [
-    ...dir.graph.people.filter((p) => !p.placeholder && p.name).map((p) => ({ id: p.id, name: p.name, nameAlt: p.nameAlt, inTree: true, photo: p.photoSrc })),
+    ...dir.graph.people
+      .filter((p) => !p.placeholder && p.name)
+      .map((p) => ({ id: p.id, name: p.name, nameAlt: p.nameAlt, gender: p.gender, born: p.born, birthplace: p.birthplace, inTree: true, photo: p.photoSrc, tree: info[p.id] })),
     ...dir.listed.map((n) => ({ id: n.id, name: n.name, inTree: false })),
   ].map((p) => ({ ...p, ...(uses.get(p.id) ?? { photos: 0, memories: 0, thumbs: [] }) }));
   return json({ people });
@@ -69,9 +46,20 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   if (!(await isAdmin(req))) return json({ error: "unauthorized" }, 401);
-  const b = (await req.json().catch(() => ({}))) as { action?: string; id?: string; into?: string; name?: string };
-  const dir = await peopleDirectory();
+  const b = (await req.json().catch(() => ({}))) as { action?: string; id?: string; into?: string; name?: string; details?: Record<string, string>; place?: { kind?: string; parentId?: string; partnerOf?: string } };
   const id = typeof b.id === "string" ? b.id : "";
+
+  // corrections to the family tree itself
+  if (b.action === "editTree") {
+    const r = await editPerson(id, b.details ?? {}, b.place);
+    return "error" in r ? json(r, 422) : json(r);
+  }
+  if (b.action === "deleteTree") {
+    const r = await deletePerson(id);
+    return "error" in r ? json(r, 422) : json(r);
+  }
+
+  const dir = await peopleDirectory();
   const listed = dir.listed.find((n) => n.id === id);
   if (!listed) return json({ error: "only names from the shared list can be changed here" }, 400);
   const recordId = id.slice(NAME_PREFIX.length);

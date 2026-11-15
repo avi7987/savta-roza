@@ -473,7 +473,7 @@ export default function AdminPage() {
                     ["removals", "בקשות הסרה", removals.length],
                     ["memories", "כל התוכן", data.memories.filter((m) => m.status === "pending").length],
                     ["family", "עץ המשפחה", count("family", "pending")],
-                    ["people", "אנשים מתויגים", 0],
+                    ["people", "אנשים", 0],
                     ["story", "סיפור החיים", 0],
                   ] as [Section, string, number][]
                 ).map(([k, label, n]) => (
