@@ -33,10 +33,13 @@ export async function POST(req: Request) {
     .map((h, i) => {
       const m = h.memoryId ? memories.get(h.memoryId) : undefined;
       const photo = m?.files.find((f) => (h.file ? f.name === h.file : f.kind === "image"));
+      // a verified fact is given in the language of the question (its vector holds both)
+      const f = h.factId ? facts.get(h.factId) : undefined;
+      const text = f ? (lang === "ru" ? f.statementRu || f.statement : f.statement) : h.text;
       return {
         n: i + 1,
         kind: h.kind,
-        text: h.text,
+        text,
         memoryId: m?.id,
         factId: h.factId,
         title: m?.title || m?.body.slice(0, 60),
@@ -57,7 +60,7 @@ export async function POST(req: Request) {
         role: "system",
         content: `You answer family members' questions about their grandmother Rosa${profile.birthYear ? ` (born ${profile.birthYear})` : ""} on her memorial website.
 Use ONLY the numbered sources below. Do not use any other knowledge and do not guess. If the sources do not answer the question, reply exactly: ${unknown}
-Answer in ${lang === "ru" ? "Russian" : "Hebrew"}, warmly and briefly (1–4 sentences). After each statement put the number of the source it comes from, like [2]. Verified facts are more reliable than memories; letters and transcripts may contain errors.
+Answer in ${lang === "ru" ? "Russian" : "Hebrew"} only (translate what the sources say if they are in another language), warmly and briefly (1–4 sentences), in your own words: do not paste the sources. Refer to her as "סבתא רוזה" / "бабушка Роза". After each statement put the number of the source it comes from, like [2]. Verified facts are more reliable than memories; letters and transcripts may contain errors.
 
 Sources:
 ${context}`,
