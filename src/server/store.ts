@@ -163,6 +163,10 @@ export type R2Like = {
 export const store: Store<StoredMemory> = lazy<StoredMemory>("memories");
 export const familyStore: Store<StoredPerson> = lazy<StoredPerson>("family");
 
+/** People named in photos and memories who are not (yet) in the family tree: one shared list. */
+export type StoredName = Base & { name: string; addedBy?: string };
+export const namesStore: Store<StoredName> = lazy<StoredName>("names");
+
 /** bytes used by every uploaded file, across memories and the family tree */
 export async function storageUsed() {
   const [a, b] = await Promise.all([store.usedBytes(), familyStore.usedBytes()]);

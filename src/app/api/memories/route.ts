@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { LIMITS, detectLang, kindOf, maxBytes } from "@/lib/limits";
 import { rateLimited } from "@/server/auth";
 import { sniff } from "@/server/sniff";
-import { family as seed } from "@/content/family";
-import { MEMORY_TYPES, familyStore, store, type MemoryType, type StoredMemory } from "@/server/store";
+import { resolvePeople } from "@/server/people";
+import { MEMORY_TYPES, store, type MemoryType, type StoredMemory } from "@/server/store";
 import { afterStore, canStore } from "@/server/quota";
 import { analyzeMemory, later } from "@/server/analyze";
 import { cleanDate, type PhotoDate } from "@/lib/photoDate";
@@ -84,10 +84,6 @@ export async function POST(req: Request) {
   const rawType = clean(form.get("type"), 20) as MemoryType;
   const type = MEMORY_TYPES.includes(rawType) ? rawType : undefined;
   const body = clean(form.get("memory"), LIMITS.body);
-  // only ids that exist in the tree can be tagged
-  const known = new Set(seed.map((p) => p.id));
-  (await familyStore.list("approved")).forEach((p) => known.add(p.replaces ?? `fam-${p.id}`));
-  const people = Array.from(new Set(form.getAll("people").filter((v): v is string => typeof v === "string" && known.has(v)))).slice(0, 40);
   const uploads = form.getAll("files").filter((f): f is File => typeof f !== "string" && f.size > 0);
 
   const errors: string[] = [];
@@ -152,6 +148,9 @@ export async function POST(req: Request) {
   if (skipped && !files.length && !body) return NextResponse.json({ error: "duplicate", skipped }, { status: 409 });
   // storage stays inside the free tier: past the cap, files are refused (text still is welcome)
   if (!(await canStore(files.reduce((s, f) => s + f.data.byteLength, 0)))) return NextResponse.json({ error: "full" }, { status: 507 });
+
+  // tagged people: known ids, and new names (added to the shared list unless already there)
+  const people = await resolvePeople(form.getAll("people"), form.getAll("newPeople"), author);
 
   // shared memories appear on the site straight away; only the owner can remove them
   const saved = await store.create({ type, author, relation, title, body, people: people.length ? people : undefined, lang: detectLang(`${title ?? ""} ${body}`) }, files, "approved");

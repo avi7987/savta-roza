@@ -5,7 +5,7 @@ import { MessageSquarePlus } from "lucide-react";
 import type { Photo } from "@/content/types";
 import { useLang } from "@/lib/i18n";
 import { formatDate, sourceLabel, type PhotoDate } from "@/lib/photoDate";
-import { useFamily } from "./family/useFamily";
+import PeoplePicker, { refreshNames, usePeople } from "./people/PeoplePicker";
 import { refreshPhotos, usePhotos } from "./gallery/usePhotos";
 import { DECADES, RemovalRequest } from "./PhotoActions";
 import { cn } from "./ui";
@@ -23,10 +23,9 @@ const myName = () => {
 /** "Tell us more about this photo": who, when, where, what happened. Every field optional. */
 function TellMore({ photo, onSaved, onCancel }: { photo: Photo; onSaved: (n: Note, date?: PhotoDate) => void; onCancel: () => void }) {
   const { t, lang } = useLang();
-  const { graph, nameOf } = useFamily();
-  const [people, setPeople] = useState<string[]>(photo.people ?? []);
-  const [filter, setFilter] = useState("");
-  const [who, setWho] = useState("");
+  // only new tags are sent; the ones already on the photo are shown with it
+  const [people, setPeople] = useState<string[]>([]);
+  const [newNames, setNewNames] = useState<string[]>([]);
   const [decade, setDecade] = useState<number | null>(null);
   const [year, setYear] = useState("");
   const [place, setPlace] = useState("");
@@ -34,13 +33,11 @@ function TellMore({ photo, onSaved, onCancel }: { photo: Photo; onSaved: (n: Not
   const [by, setBy] = useState(myName);
   const [state, setState] = useState<"idle" | "sending" | "failed" | "empty">("idle");
   const canDate = !photo.when || photo.when.source === "ai";
-  const known = useMemo(() => graph.people.filter((p) => p.name && !p.placeholder && !p.pending), [graph]);
-  const list = known.filter((p) => !filter || `${p.name} ${p.nameAlt ?? ""}`.toLowerCase().includes(filter.toLowerCase()));
   const decadeLabel = (d: number) => (lang === "ru" ? `${d}-е` : d >= 2000 ? `שנות ה־${d}` : `שנות ה־${String(d).slice(2)}`);
 
   const send = async () => {
     const added = people.filter((id) => !(photo.people ?? []).includes(id));
-    if (!added.length && !who.trim() && !decade && !year && !place.trim() && !what.trim()) return setState("empty");
+    if (!added.length && !newNames.length && !decade && !year && !place.trim() && !what.trim()) return setState("empty");
     setState("sending");
     try {
       localStorage.setItem(NAME_KEY, by.trim());
@@ -48,11 +45,12 @@ function TellMore({ photo, onSaved, onCancel }: { photo: Photo; onSaved: (n: Not
     const r = await fetch("/api/photos/info", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ memoryId: photo.memoryId, file: photo.file, people: added, who, decade: canDate && !year ? decade : undefined, year: canDate && year ? Number(year) : undefined, place, what, by }),
+      body: JSON.stringify({ memoryId: photo.memoryId, file: photo.file, people: added, newPeople: newNames, decade: canDate && !year ? decade : undefined, year: canDate && year ? Number(year) : undefined, place, what, by }),
     }).catch(() => null);
     if (!r?.ok) return setState("failed");
     const d = (await r.json()) as { file?: { notes?: Note[]; date?: PhotoDate } };
     onSaved(d.file?.notes?.at(-1) ?? { at: new Date().toISOString() }, d.file?.date);
+    if (newNames.length) refreshNames();
     refreshPhotos();
   };
 
@@ -71,23 +69,15 @@ function TellMore({ photo, onSaved, onCancel }: { photo: Photo; onSaved: (n: Not
         <p className="mt-1 text-[0.92rem] text-ink-soft">{t.info.tellLead}</p>
       </div>
 
-      <fieldset className="flex flex-col gap-2">
-        <legend className={cn(label, "mb-2")}>{t.info.who}</legend>
-        {known.length > 8 && <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={t.info.findName} aria-label={t.info.findName} className={field} />}
-        {known.length > 0 && (
-          <div className="flex max-h-44 flex-wrap gap-1.5 overflow-y-auto">
-            {list.map((p) => {
-              const on = people.includes(p.id);
-              return (
-                <button key={p.id} type="button" aria-pressed={on} onClick={() => setPeople(on ? people.filter((x) => x !== p.id) : [...people, p.id])} className={cn("min-h-10 rounded-full px-3.5 text-[0.95rem] transition-colors", on ? "bg-burgundy text-white" : "bg-ivory text-charcoal ring-1 ring-charcoal/10")}>
-                  {nameOf(p.id)}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        <input value={who} onChange={(e) => setWho(e.target.value)} maxLength={300} placeholder={t.info.whoFree} aria-label={t.info.whoFree} className={field} />
-      </fieldset>
+      <PeoplePicker
+        label={t.info.who}
+        selected={people}
+        added={newNames}
+        onChange={(ids, names) => {
+          setPeople(ids);
+          setNewNames(names);
+        }}
+      />
 
       {canDate && (
         <fieldset className="flex flex-col gap-2">
@@ -138,7 +128,7 @@ function TellMore({ photo, onSaved, onCancel }: { photo: Photo; onSaved: (n: Not
  */
 export default function PhotoInfo({ photo, onChange, onJump }: { photo: Photo; onChange: (patch: Partial<Photo>) => void; onJump: (p: Photo) => void }) {
   const { t, l, lang } = useLang();
-  const { nameOf, graph } = useFamily();
+  const { labelOf } = usePeople();
   const { photos: all } = usePhotos();
   const [telling, setTelling] = useState(false);
   const [thanks, setThanks] = useState(false);
@@ -150,7 +140,7 @@ export default function PhotoInfo({ photo, onChange, onJump }: { photo: Photo; o
     return Array.from(new Map([...same, ...withPeople, ...near].map((p) => [p.id, p])).values()).slice(0, 8);
   }, [all, photo]);
 
-  const people = (photo.people ?? []).filter((id) => graph.byId.has(id));
+  const people = (photo.people ?? []).filter((id) => labelOf(id));
   const notes = photo.notes ?? [];
   const estimate = photo.when?.source === "ai";
 
@@ -182,7 +172,7 @@ export default function PhotoInfo({ photo, onChange, onJump }: { photo: Photo; o
           <ul className="flex flex-wrap gap-1.5">
             {people.map((id) => (
               <li key={id} className="rounded-full bg-white px-3 py-1.5 text-[0.95rem] ring-1 ring-charcoal/10">
-                {nameOf(id)}
+                {labelOf(id)}
               </li>
             ))}
           </ul>
@@ -197,7 +187,7 @@ export default function PhotoInfo({ photo, onChange, onJump }: { photo: Photo; o
               <li key={n.at} className="rounded-xl bg-white/70 p-4 ring-1 ring-charcoal/5">
                 {n.what && <p dir="auto" className="whitespace-pre-line leading-relaxed">{n.what}</p>}
                 <p className="mt-1 text-[0.9rem] text-charcoal/80">
-                  {[n.when && `${t.info.whenShort}: ${n.when}`, n.place && `${t.info.whereShort}: ${n.place}`, (n.people?.length || n.who) && `${t.info.whoShort}: ${[...(n.people ?? []).map(nameOf), n.who].filter(Boolean).join(", ")}`].filter(Boolean).join(" · ")}
+                  {[n.when && `${t.info.whenShort}: ${n.when}`, n.place && `${t.info.whereShort}: ${n.place}`, (n.people?.length || n.who) && `${t.info.whoShort}: ${[...(n.people ?? []).map(labelOf), n.who].filter(Boolean).join(", ")}`].filter(Boolean).join(" · ")}
                 </p>
                 <p className="mt-1 text-[0.8rem] text-ink-soft">— {n.by || t.info.someone}</p>
               </li>

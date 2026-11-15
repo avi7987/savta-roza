@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { family as seed } from "@/content/family";
-import { FamilyGraph, expandRequest, mergePeople } from "@/lib/family";
+import { peopleDirectory } from "@/server/people";
 import { decadeOf, formatDate, sortYear } from "@/lib/photoDate";
-import { familyStore, store } from "@/server/store";
+import { store } from "@/server/store";
 
 export const runtime = "nodejs";
 
@@ -24,12 +23,8 @@ export async function GET(req: Request) {
   const words = q.split(/\s+/).filter((w) => w.length > 1 || /\d/.test(w));
   if (!words.length) return NextResponse.json({ results: [] });
 
-  const approved = (await familyStore.list()).filter((p) => p.status === "approved");
-  const graph = new FamilyGraph(mergePeople(seed, approved.flatMap((p) => expandRequest(p, `fam-${p.id}`))));
-  const nameOf = (id: string) => {
-    const p = graph.byId.get(id);
-    return p ? [p.name, p.nameAlt].filter(Boolean).join(" ") : "";
-  };
+  // names of tagged people: from the tree and from the shared list
+  const { nameOf } = await peopleDirectory();
 
   const results: { type: "photo" | "memory"; id: string; ids?: string[]; count?: number; memoryId: string; file?: string; kind?: string; title?: string; text?: string; author: string; year?: number; src?: string; score: number }[] = [];
   for (const m of await store.list()) {

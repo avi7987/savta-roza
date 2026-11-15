@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { LIMITS } from "@/lib/limits";
 import { cleanDate, formatDate } from "@/lib/photoDate";
 import { rateLimited } from "@/server/auth";
-import { familyStore, store, type FileNote } from "@/server/store";
-import { FamilyGraph, expandRequest, mergePeople } from "@/lib/family";
-import { family as seed } from "@/content/family";
+import { store, type FileNote } from "@/server/store";
+import { resolvePeople } from "@/server/people";
 
 export const runtime = "nodejs";
 
@@ -13,7 +12,7 @@ const text = (v: unknown, n: number) => (typeof v === "string" ? v.trim().slice(
 /**
  * "Tell us more about this photo": who is in it, when, where, what happened.
  * Every answer is kept as its own attributed note. A date only fills in a photo that has none
- * (or only a machine estimate); tagged people must already be in the family tree.
+ * (or only a machine estimate). People are tagged from the tree or the shared list of names.
  */
 export async function POST(req: Request) {
   if (rateLimited(req, 30, 10 * 60 * 1000, "info")) return NextResponse.json({ error: "rate" }, { status: 429 });
@@ -24,10 +23,8 @@ export async function POST(req: Request) {
   const f = m?.files.find((x) => x.name === file);
   if (!m || m.status === "rejected" || !f) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  // people must be real entries of the tree, as visitors see it
-  const approved = (await familyStore.list()).filter((p) => p.status === "approved");
-  const graph = new FamilyGraph(mergePeople(seed, approved.flatMap((p) => expandRequest(p, `fam-${p.id}`))));
-  const people = Array.isArray(b.people) ? Array.from(new Set(b.people.filter((id): id is string => typeof id === "string" && graph.byId.has(id)))).slice(0, 30) : [];
+  // tagged people: entries of the tree or of the shared list; new names join the list
+  const people = (await resolvePeople(b.people, b.newPeople, text(b.by, LIMITS.name))).slice(0, 30);
 
   const year = Number(b.year);
   const decade = Number(b.decade);

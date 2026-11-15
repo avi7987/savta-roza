@@ -11,8 +11,7 @@ import { decadeLabel, formatDate } from "@/lib/photoDate";
 import { RoseTop } from "../Botanical";
 import { STATIC } from "../Transition";
 import { buttonClass, cn } from "../ui";
-import { useFamily } from "../family/useFamily";
-import PersonAvatar from "../family/PersonAvatar";
+import PeoplePicker, { refreshNames, usePeople } from "../people/PeoplePicker";
 
 type MType = "photos" | "video" | "audio" | "story" | "letter" | "recipe";
 type TextType = "story" | "letter" | "recipe";
@@ -133,6 +132,7 @@ export default function AddMemoryWizard() {
   const [files, setFiles] = useState<Picked[]>([]);
   const [when, setWhen] = useState<When>({ mode: "unknown", date: "", year: "" });
   const [tagged, setTagged] = useState<string[]>([]);
+  const [newNames, setNewNames] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [state, setState] = useState<"idle" | "sending" | "done" | "error" | "full">("idle");
   const [progress, setProgress] = useState(0);
@@ -141,9 +141,7 @@ export default function AddMemoryWizard() {
   const [restored, setRestored] = useState<null | { files: boolean }>(null);
   const ready = useRef(false);
   const trap = useRef<HTMLInputElement>(null);
-  const fam = useFamily();
-  const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
-  const people = fam.graph.people.filter((p) => !p.placeholder).sort((a, b) => (fam.graph.ring(a.id) ?? 9) - (fam.graph.ring(b.id) ?? 9));
+  const { labelOf } = usePeople();
 
   // arrive with ?type=photos, or pick up a draft left earlier in this browser
   useEffect(() => {
@@ -156,6 +154,7 @@ export default function AddMemoryWizard() {
         setValues({ ...d.values, name: d.values?.name || name });
         if (d.when) setWhen(d.when);
         if (Array.isArray(d.tagged)) setTagged(d.tagged);
+        if (Array.isArray(d.newNames)) setNewNames(d.newNames);
         setStep(d.fileCount && d.step > 1 ? 1 : Math.min(d.step ?? 0, 3));
         setRestored({ files: d.fileCount > 0 });
         ready.current = true;
@@ -177,11 +176,11 @@ export default function AddMemoryWizard() {
     const id = setTimeout(() => {
       try {
         if (!type && !values.memory && !values.title) localStorage.removeItem(DRAFT);
-        else localStorage.setItem(DRAFT, JSON.stringify({ at: Date.now(), type, values, when, tagged, step, fileCount: files.length }));
+        else localStorage.setItem(DRAFT, JSON.stringify({ at: Date.now(), type, values, when, tagged, newNames, step, fileCount: files.length }));
       } catch {}
     }, 400);
     return () => clearTimeout(id);
-  }, [type, values, when, tagged, step, files.length, state]);
+  }, [type, values, when, tagged, newNames, step, files.length, state]);
 
   // previews are released when the page closes, not each time the list changes
   const urls = useRef<string[]>([]);
@@ -265,6 +264,7 @@ export default function AddMemoryWizard() {
     setValues((v) => ({ name: v.name, relation: "", title: "", memory: "" }));
     setFiles([]);
     setTagged([]);
+    setNewNames([]);
     setWhen({ mode: "unknown", date: "", year: "" });
     setErrors({});
     setSkipped(0);
@@ -300,6 +300,7 @@ export default function AddMemoryWizard() {
     fd.set("title", values.title.trim());
     fd.set("memory", values.memory.trim());
     tagged.forEach((id) => fd.append("people", id));
+    newNames.forEach((n) => fd.append("newPeople", n));
     sendable.forEach((f, i) => {
       fd.append("files", f.file);
       if (f.prep?.thumb) fd.append(`thumb-${i}`, f.prep.thumb, "thumb.jpg");
@@ -329,6 +330,7 @@ export default function AddMemoryWizard() {
       try {
         localStorage.removeItem(DRAFT);
       } catch {}
+      if (newNames.length) refreshNames();
       setState("done");
     };
     xhr.send(fd);
@@ -604,30 +606,15 @@ export default function AddMemoryWizard() {
             </fieldset>
           )}
 
-          {people.length > 0 && (
-            <fieldset className="flex flex-col gap-3">
-              <legend className="mb-1 text-[1.02rem] text-charcoal">{visual ? s.people : w.about}</legend>
-              {visual && <p className="text-[0.86rem] text-ink-soft">{s.peopleHint}</p>}
-              <div className="flex flex-wrap gap-2">
-                {people.map((p) => {
-                  const on = tagged.includes(p.id);
-                  const label = cap(fam.nameOf(p.id));
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      aria-pressed={on}
-                      onClick={() => setTagged((cur) => (on ? cur.filter((x) => x !== p.id) : [...cur, p.id]))}
-                      className={cn("inline-flex min-h-12 items-center gap-2 rounded-full border py-1 pe-4 ps-1 text-[0.95rem] transition-colors", on ? "border-burgundy bg-burgundy text-white" : "border-charcoal/15 bg-white text-charcoal hover:border-burgundy/40")}
-                    >
-                      <PersonAvatar person={p} label={label} className="w-9 text-[0.72rem]" />
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
-          )}
+          <PeoplePicker
+            label={visual ? s.people : w.about}
+            selected={tagged}
+            added={newNames}
+            onChange={(ids, names) => {
+              setTagged(ids);
+              setNewNames(names);
+            }}
+          />
         </div>
       );
 
@@ -700,10 +687,10 @@ export default function AddMemoryWizard() {
                 <dd>{whenLabel()}</dd>
               </div>
             )}
-            {tagged.length > 0 && (
+            {tagged.length + newNames.length > 0 && (
               <div className="flex gap-1">
                 <dt className="sr-only">{s.people}</dt>
-                <dd>{tagged.map((id) => cap(fam.nameOf(id))).join(", ")}</dd>
+                <dd>{[...tagged.map(labelOf), ...newNames].join(", ")}</dd>
               </div>
             )}
             {values.name.trim() && (
