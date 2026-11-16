@@ -47,6 +47,11 @@ export async function enqueueMemory(m: StoredMemory) {
   await enqueue("index", m.id);
 }
 
+/** people were tagged: what the answers know about this memory is refreshed (no new facts needed) */
+export async function enqueueIndex(memoryId: string) {
+  await enqueue("index", memoryId);
+}
+
 /** after the family told more about a photo, look at the memory again */
 export async function enqueueFacts(memoryId: string) {
   await enqueue("facts", memoryId);

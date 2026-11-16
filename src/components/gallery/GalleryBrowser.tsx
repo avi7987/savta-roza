@@ -138,6 +138,16 @@ function Browser() {
             )}
           </div>
 
+          {loaded && photos.length > 0 && (
+            <div className="mt-4 flex flex-wrap justify-center gap-x-5 gap-y-1 text-[0.95rem]">
+              <TLink href="/sort" className="min-h-10 py-2 text-burgundy underline decoration-dusty/50 underline-offset-4">
+                {t.sort.cta}
+              </TLink>
+              <TLink href="/share/bulk" className="min-h-10 py-2 text-burgundy underline decoration-dusty/50 underline-offset-4">
+                {t.bulk.cta}
+              </TLink>
+            </div>
+          )}
           {!loaded && <p className="mt-16 text-center text-ink-soft">{t.album.loading}</p>}
 
           {loaded && photos.length === 0 && (
