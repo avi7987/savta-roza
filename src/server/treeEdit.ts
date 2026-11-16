@@ -139,7 +139,9 @@ export async function editPerson(id: string, d: Details, place?: Place): Promise
   } else {
     // a person from the starting tree, or an empty slot: the correction is kept as a filled-in entry
     const p = graph.byId.get(id)!;
-    await familyStore.create({ replaces: id, name: fields.name ?? p.name, nameAlt: fields.nameAlt ?? p.nameAlt, gender: (fields.gender ?? p.gender) as StoredPerson["gender"], born: fields.born ?? p.born, died: fields.died ?? p.died, birthplace: fields.birthplace ?? p.birthplace }, [], "approved");
+    // a field that was emptied stays empty (it is in the correction, with no value)
+    const pick = <K extends "nameAlt" | "born" | "died" | "birthplace">(k: K) => (k in fields ? fields[k] : p[k]);
+    await familyStore.create({ replaces: id, name: fields.name ?? p.name, nameAlt: pick("nameAlt"), gender: (fields.gender ?? p.gender) as StoredPerson["gender"], born: pick("born"), died: pick("died"), birthplace: pick("birthplace") }, [], "approved");
   }
   return { ok: true };
 }

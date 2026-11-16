@@ -47,7 +47,7 @@ export default function PersonCard({
   const m = t.family.map;
   const isRosa = person.id === ROSA;
   const born = year(person.born);
-  const died = year(person.died);
+  const died = person.died === "?" ? undefined : year(person.died);
   const years = born || died ? `${born ?? "?"}${died ? `–${died}` : ""}` : "";
   const label = cap(name);
 

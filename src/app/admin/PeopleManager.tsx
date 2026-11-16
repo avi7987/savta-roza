@@ -36,7 +36,8 @@ const ERRORS: Record<string, string> = {
 
 /** fix a tree person's details and, when it came in as a request, their place in the tree */
 function TreeEdit({ p, people, busy, onSave, onCancel }: { p: P; people: P[]; busy: boolean; onSave: (details: object, place?: object) => void; onCancel: () => void }) {
-  const [f, setF] = useState({ name: p.name, nameAlt: p.nameAlt ?? "", gender: p.gender ?? "x", born: p.born ?? "", died: p.died ?? "", birthplace: p.birthplace ?? "" });
+  const [gone, setGone] = useState(!!p.died);
+  const [f, setF] = useState({ name: p.name, nameAlt: p.nameAlt ?? "", gender: p.gender ?? "x", born: p.born ?? "", died: p.died === "?" ? "" : (p.died ?? ""), birthplace: p.birthplace ?? "" });
   const was = currentPlace(p.tree?.relation);
   const [kind, setKind] = useState<PlaceKind | "">(was);
   const [target, setTarget] = useState((was === "partner" ? p.tree?.partnerId : p.tree?.parentId) ?? "");
@@ -50,7 +51,8 @@ function TreeEdit({ p, people, busy, onSave, onCancel }: { p: P; people: P[]; bu
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        onSave(f, placeChanged ? { kind, parentId: kind !== "partner" ? target : undefined, partnerOf: kind === "partner" ? target : undefined } : undefined);
+        // "?" keeps someone marked as no longer with us when the year is not known
+        onSave({ ...f, died: gone ? f.died.trim() || "?" : "" }, placeChanged ? { kind, parentId: kind !== "partner" ? target : undefined, partnerOf: kind === "partner" ? target : undefined } : undefined);
       }}
       className="mt-3 grid gap-4 rounded-md bg-ivory p-4 sm:grid-cols-2"
     >
@@ -83,10 +85,18 @@ function TreeEdit({ p, people, busy, onSave, onCancel }: { p: P; people: P[]; bu
           שנת לידה
           <input value={f.born} onChange={(e) => setF({ ...f, born: e.target.value })} maxLength={20} inputMode="numeric" className={field} />
         </label>
-        <label className="flex flex-col gap-1">
-          שנת פטירה
-          <input value={f.died} onChange={(e) => setF({ ...f, died: e.target.value })} maxLength={20} inputMode="numeric" className={field} />
-        </label>
+        <div className="flex flex-col gap-1">
+          <label className="flex min-h-10 items-center gap-2">
+            <input type="checkbox" checked={gone} onChange={(e) => { setGone(e.target.checked); if (!e.target.checked) setF({ ...f, died: "" }); }} className="h-4 w-4 accent-burgundy" />
+            כבר לא איתנו
+          </label>
+          {gone && (
+            <label className="flex flex-col gap-1">
+              באיזו שנה? (אם ידוע)
+              <input value={f.died} onChange={(e) => setF({ ...f, died: e.target.value })} maxLength={20} inputMode="numeric" className={field} />
+            </label>
+          )}
+        </div>
         <label className="flex flex-col gap-1 col-span-2">
           מקום לידה
           <input value={f.birthplace} onChange={(e) => setF({ ...f, birthplace: e.target.value })} maxLength={80} className={field} />

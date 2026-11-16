@@ -116,7 +116,7 @@ function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: str
     else animate(sheetY, 0, { type: "spring", visualDuration: 0.35, bounce: 0 });
   };
 
-  const facts = [p.born && [t.family.born, p.born], p.birthplace && [t.family.from, p.birthplace], p.died && [t.family.died, p.died]].filter(Boolean) as [string, string][];
+  const facts = [p.born && [t.family.born, p.born], p.birthplace && [t.family.from, p.birthplace], p.died && p.died !== "?" && [t.family.died, p.died]].filter(Boolean) as [string, string][];
 
   return (
     <>

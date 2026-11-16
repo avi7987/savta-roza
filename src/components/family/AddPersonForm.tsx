@@ -52,7 +52,9 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
   const [q, setQ] = useState("");
   const [rel, setRel] = useState<LinkRel | "">("");
   const [other, setOther] = useState<string>("");
-  const [v, setV] = useState({ name: existing?.placeholder ? "" : (existing?.name ?? ""), nameAlt: existing?.nameAlt ?? "", gender: (existing?.gender ?? "x") as Gender, born: existing?.born ?? "", died: existing?.died ?? "", birthplace: existing?.birthplace ?? "", about: existing?.about ?? "" });
+  const [v, setV] = useState({ name: existing?.placeholder ? "" : (existing?.name ?? ""), nameAlt: existing?.nameAlt ?? "", gender: (existing?.gender ?? "x") as Gender, born: existing?.born ?? "", died: existing?.died === "?" ? "" : (existing?.died ?? ""), birthplace: existing?.birthplace ?? "", about: existing?.about ?? "" });
+  // whether the person is no longer alive: a small box, and only then a place for the year
+  const [gone, setGone] = useState(!!existing?.died);
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [consent, setConsent] = useState(false);
@@ -113,7 +115,8 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
       nameAlt: v.nameAlt.trim() || undefined,
       gender: v.gender,
       born: v.born.trim() || undefined,
-      died: v.died.trim() || undefined,
+      // "?" keeps someone marked as no longer with us when the year is not known
+      died: gone ? v.died.trim() || "?" : undefined,
       birthplace: v.birthplace.trim() || undefined,
       about: v.about.trim() || undefined,
     };
@@ -249,9 +252,25 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
             <label htmlFor={`${uid}-b`}>{f.born}</label>
             <input id={`${uid}-b`} value={v.born} onChange={(e) => setV({ ...v, born: e.target.value })} inputMode="numeric" maxLength={20} className={input} />
           </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor={`${uid}-d`}>{w.died}</label>
-            <input id={`${uid}-d`} value={v.died} onChange={(e) => setV({ ...v, died: e.target.value })} inputMode="numeric" maxLength={20} className={input} />
+          <div className="flex flex-col justify-end gap-2">
+            <label className="flex min-h-11 w-fit cursor-pointer items-center gap-2.5 text-[0.95rem] text-ink-soft">
+              <input
+                type="checkbox"
+                checked={gone}
+                onChange={(e) => {
+                  setGone(e.target.checked);
+                  if (!e.target.checked) setV({ ...v, died: "" });
+                }}
+                className="h-4 w-4 accent-burgundy"
+              />
+              {w.gone}
+            </label>
+            {gone && (
+              <div className="flex flex-col gap-2">
+                <label htmlFor={`${uid}-d`} className="text-[0.9rem]">{w.died}</label>
+                <input id={`${uid}-d`} value={v.died} onChange={(e) => setV({ ...v, died: e.target.value })} inputMode="numeric" maxLength={20} className={input} />
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-2 sm:col-span-2">
             <label htmlFor={`${uid}-p`}>{f.birthplace}</label>
@@ -296,7 +315,7 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
       );
 
     // a last look: the new card, and where it goes
-    const draft = { id: "draft", name, nameAlt: v.nameAlt, gender: v.gender, born: v.born, died: v.died, photoSrc: preview || existing?.photoSrc, pending: true };
+    const draft = { id: "draft", name, nameAlt: v.nameAlt, gender: v.gender, born: v.born, died: gone ? v.died || "?" : "", photoSrc: preview || existing?.photoSrc, pending: true };
     return (
       <div className="flex flex-col gap-5">
         <h3 className="font-display text-[1.6rem] font-light text-burgundy">{w.review}</h3>
