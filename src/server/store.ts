@@ -18,6 +18,9 @@ export type StoredFile = {
   /** a small JPEG preview stored next to the original */
   thumb?: string;
   thumbSize?: number;
+  /** a video's soundtrack, taken out in the browser (mono WAV), so what is said can be written down */
+  sound?: string;
+  soundSize?: number;
   width?: number;
   height?: number;
   /** when it was taken, and how we know */
@@ -89,6 +92,7 @@ export type NewFile = {
   ext: string;
   kind: StoredFile["kind"];
   thumb?: Uint8Array;
+  sound?: Uint8Array;
   width?: number;
   height?: number;
   date?: PhotoDate;

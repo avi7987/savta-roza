@@ -304,6 +304,7 @@ export default function AddMemoryWizard() {
     sendable.forEach((f, i) => {
       fd.append("files", f.file);
       if (f.prep?.thumb) fd.append(`thumb-${i}`, f.prep.thumb, "thumb.jpg");
+      if (f.prep?.sound) fd.append(`sound-${i}`, f.prep.sound, "sound.wav");
     });
     fd.set("filesMeta", JSON.stringify(sendable.map((f) => ({ date: f.prep?.date, nameDate: f.prep?.nameDate, width: f.prep?.width, height: f.prep?.height, sha: f.prep?.sha, phash: f.prep?.phash }))));
     fd.set("when", JSON.stringify({ mode: when.mode, date: when.date, year: Number(when.year) || undefined, decade: when.decade }));

@@ -121,12 +121,19 @@ export async function POST(req: Request) {
       const bytes = new Uint8Array(await t.arrayBuffer());
       if (sniff(bytes)?.kind === "image") thumb = bytes;
     }
+    // a video's soundtrack, taken out in the browser so what is said in it can be written down: must be a real WAV
+    const so = found.kind === "video" ? form.get(`sound-${i}`) : null;
+    let sound: Uint8Array | undefined;
+    if (so && typeof so !== "string" && so.size > 0 && so.size <= 20_000_000) {
+      const bytes = new Uint8Array(await so.arrayBuffer());
+      if (sniff(bytes)?.ext === "wav") sound = bytes;
+    }
     const m = meta[i] ?? {};
     const dim = (n: unknown) => (Number.isFinite(Number(n)) && Number(n) > 0 && Number(n) < 20000 ? Math.round(Number(n)) : undefined);
     // the file's own date, else the date in its name (e.g. IMG-20120514-WA0001), else a year the memory mentions
     const textYear = yearInText(`${title ?? ""} ${body}`);
     const exif = cleanDate({ date: m.date }, "exif") ?? cleanDate({ date: m.nameDate }, "exif") ?? (textYear ? cleanDate({ year: textYear }, "user") : undefined);
-    files.push({ data, ext: found.ext, kind: found.kind, thumb, sha: isSha(m.sha) ? m.sha : undefined, phash: isPhash(m.phash) ? m.phash : undefined, width: dim(m.width), height: dim(m.height), date: found.kind === "audio" ? userDate : (userDate ?? exif), category: found.kind === "audio" ? undefined : category });
+    files.push({ data, ext: found.ext, kind: found.kind, thumb, sound, sha: isSha(m.sha) ? m.sha : undefined, phash: isPhash(m.phash) ? m.phash : undefined, width: dim(m.width), height: dim(m.height), date: found.kind === "audio" ? userDate : (userDate ?? exif), category: found.kind === "audio" ? undefined : category });
   }
 
   if (errors.length) return NextResponse.json({ error: "invalid", fields: Array.from(new Set(errors)) }, { status: 422 });

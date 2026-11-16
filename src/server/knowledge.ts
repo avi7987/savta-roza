@@ -39,7 +39,8 @@ async function enqueue(type: StoredJob["type"], memoryId: string, file?: string)
 export async function enqueueMemory(m: StoredMemory) {
   for (const f of m.files) {
     if (f.deleteRequest) continue;
-    if (f.kind === "audio") await enqueue("transcribe", m.id, f.name);
+    // recordings, and videos whose soundtrack was taken out when they were shared
+    if (f.kind === "audio" || (f.kind === "video" && f.sound)) await enqueue("transcribe", m.id, f.name);
     if (f.kind === "image" && TYPES_TO_READ.has(m.type ?? "")) await enqueue("ocr", m.id, f.name);
   }
   await enqueue("facts", m.id);
@@ -132,8 +133,12 @@ async function transcribe(j: StoredJob): Promise<boolean | "skip"> {
   const m = await store.get(j.memoryId);
   const f = m?.files.find((x) => x.name === j.file);
   if (!m || !f) return "skip";
-  if (f.size > MAX_AUDIO) throw new Error("too long to transcribe");
-  const bytes = await store.readFile(m.id, f.name);
+  // a video is heard through its soundtrack
+  const sound = f.kind === "video" ? f.sound : f.name;
+  const size = f.kind === "video" ? (f.soundSize ?? 0) : f.size;
+  if (!sound) return "skip";
+  if (size > MAX_AUDIO) throw new Error("too long to transcribe");
+  const bytes = await store.readFile(m.id, sound);
   if (!bytes) return "skip";
   const res = await runAi<{ text?: string }>("speech", MODELS.speech, { audio: base64(bytes) });
   if (!res) return false;

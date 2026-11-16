@@ -51,7 +51,12 @@ export function fileStore<T extends Base>(collection: string): Store<T> {
             thumb = `${randomUUID()}.jpg`;
             await writeFile(path.join(dir, thumb), f.thumb);
           }
-          stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category, sha: f.sha, phash: f.phash });
+          let sound: string | undefined;
+          if (f.sound) {
+            sound = `${randomUUID()}.wav`;
+            await writeFile(path.join(dir, sound), f.sound);
+          }
+          stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, sound, soundSize: f.sound?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category, sha: f.sha, phash: f.phash });
         }
         const record = { ...fields, id, status, createdAt: new Date().toISOString(), files: stored } as T;
         const all = await read();
@@ -93,23 +98,23 @@ export function fileStore<T extends Base>(collection: string): Store<T> {
         const m = all.find((x) => x.id === id);
         const f = m?.files.find((x) => x.name === name);
         if (!m || !f) return 0;
-        for (const n of [f.name, f.thumb]) if (n) await rm(path.join(uploads, id, n), { force: true });
+        for (const n of [f.name, f.thumb, f.sound]) if (n) await rm(path.join(uploads, id, n), { force: true });
         m.files = m.files.filter((x) => x.name !== name);
         await write(all);
-        return f.size + (f.thumbSize ?? 0);
+        return f.size + (f.thumbSize ?? 0) + (f.soundSize ?? 0);
       }),
     removeFiles: (id) =>
       locked(async () => {
         const all = await read();
         const m = all.find((x) => x.id === id);
         if (!m || !m.files.length) return 0;
-        const freed = m.files.reduce((s, f) => s + f.size + (f.thumbSize ?? 0), 0);
+        const freed = m.files.reduce((s, f) => s + f.size + (f.thumbSize ?? 0) + (f.soundSize ?? 0), 0);
         await rm(path.join(uploads, id), { recursive: true, force: true });
         m.files = [];
         await write(all);
         return freed;
       }),
-    usedBytes: async () => (await read()).reduce((s, m) => s + m.files.reduce((t, f) => t + f.size + (f.thumbSize ?? 0), 0), 0),
+    usedBytes: async () => (await read()).reduce((s, m) => s + m.files.reduce((t, f) => t + f.size + (f.thumbSize ?? 0) + (f.soundSize ?? 0), 0), 0),
     getMeta: async (key) => {
       try {
         return (JSON.parse(await readFile(path.join(ROOT, "meta.json"), "utf8")) as Record<string, string>)[key];

@@ -26,7 +26,12 @@ export function cloudStore<T extends Base>(collection: string, db: D1Like, files
           thumb = `${crypto.randomUUID()}.jpg`;
           await files.put(key(id, thumb), f.thumb, { httpMetadata: { contentType: "image/jpeg" } });
         }
-        stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category, sha: f.sha, phash: f.phash });
+        let sound: string | undefined;
+        if (f.sound) {
+          sound = `${crypto.randomUUID()}.wav`;
+          await files.put(key(id, sound), f.sound, { httpMetadata: { contentType: "audio/wav" } });
+        }
+        stored.push({ name, kind: f.kind, size: f.data.byteLength, thumb, thumbSize: f.thumb?.byteLength, sound, soundSize: f.sound?.byteLength, width: f.width, height: f.height, date: f.date, category: f.category, sha: f.sha, phash: f.phash });
       }
       const record = { ...fields, id, status, createdAt: new Date().toISOString(), files: stored } as T;
       await db
@@ -68,23 +73,23 @@ export function cloudStore<T extends Base>(collection: string, db: D1Like, files
       const cur = await this.get(id);
       const f = cur?.files.find((x) => x.name === name);
       if (!cur || !f) return 0;
-      await files.delete([key(id, f.name), ...(f.thumb ? [key(id, f.thumb)] : [])]);
+      await files.delete([key(id, f.name), ...(f.thumb ? [key(id, f.thumb)] : []), ...(f.sound ? [key(id, f.sound)] : [])]);
       const next = { ...cur, files: cur.files.filter((x) => x.name !== name) };
       await db.prepare("UPDATE records SET data = ?1 WHERE collection = ?2 AND id = ?3").bind(JSON.stringify(next), collection, id).run();
-      return f.size + (f.thumbSize ?? 0);
+      return f.size + (f.thumbSize ?? 0) + (f.soundSize ?? 0);
     },
     async removeFiles(id) {
       const cur = await this.get(id);
       if (!cur || !cur.files.length) return 0;
-      await files.delete(cur.files.flatMap((f) => [key(id, f.name), ...(f.thumb ? [key(id, f.thumb)] : [])]));
-      const freed = cur.files.reduce((s, f) => s + f.size + (f.thumbSize ?? 0), 0);
+      await files.delete(cur.files.flatMap((f) => [key(id, f.name), ...(f.thumb ? [key(id, f.thumb)] : []), ...(f.sound ? [key(id, f.sound)] : [])]));
+      const freed = cur.files.reduce((s, f) => s + f.size + (f.thumbSize ?? 0) + (f.soundSize ?? 0), 0);
       const next = { ...cur, files: [] };
       await db.prepare("UPDATE records SET data = ?1 WHERE collection = ?2 AND id = ?3").bind(JSON.stringify(next), collection, id).run();
       return freed;
     },
     async usedBytes() {
       const row = await db
-        .prepare("SELECT COALESCE(SUM(json_extract(f.value, '$.size') + COALESCE(json_extract(f.value, '$.thumbSize'), 0)), 0) AS used FROM records, json_each(records.data, '$.files') AS f WHERE records.collection = ?1")
+        .prepare("SELECT COALESCE(SUM(json_extract(f.value, '$.size') + COALESCE(json_extract(f.value, '$.thumbSize'), 0) + COALESCE(json_extract(f.value, '$.soundSize'), 0)), 0) AS used FROM records, json_each(records.data, '$.files') AS f WHERE records.collection = ?1")
         .bind(collection)
         .first<{ used: number }>();
       return Number(row?.used ?? 0);

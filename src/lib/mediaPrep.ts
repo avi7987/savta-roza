@@ -6,7 +6,50 @@
   keeps the gallery fast and is what the date-estimating model looks at.
 */
 
-export type Prepared = { date?: string; nameDate?: string; width?: number; height?: number; thumb?: Blob; sha?: string; phash?: string };
+export type Prepared = { date?: string; nameDate?: string; width?: number; height?: number; thumb?: Blob; sha?: string; phash?: string; sound?: Blob };
+
+/** how much of a video's sound is kept for writing down what is said (16 kHz mono WAV: about 15 MB) */
+const SOUND_RATE = 16000;
+const SOUND_SECONDS = 8 * 60;
+
+/**
+ * A video's soundtrack as a small mono WAV, so the site can write down what is said in it.
+ * Done here in the browser, for free; if the browser cannot read the sound (or there is none,
+ * or it is silent), there is simply no soundtrack and nothing else changes.
+ */
+export async function soundOf(file: File): Promise<Blob | undefined> {
+  if (typeof OfflineAudioContext === "undefined" || file.size > 200 * 1024 * 1024) return;
+  const ctx = new OfflineAudioContext(1, SOUND_RATE, SOUND_RATE);
+  const audio = await ctx.decodeAudioData(await file.arrayBuffer());
+  const n = Math.min(audio.length, SOUND_RATE * SOUND_SECONDS);
+  if (n < SOUND_RATE) return; // under a second
+  const mono = new Float32Array(n);
+  for (let c = 0; c < audio.numberOfChannels; c++) {
+    const ch = audio.getChannelData(c);
+    for (let i = 0; i < n; i++) mono[i] += ch[i] / audio.numberOfChannels;
+  }
+  let sum = 0;
+  for (let i = 0; i < n; i += 16) sum += mono[i] * mono[i];
+  if (Math.sqrt(sum / (n / 16)) < 0.003) return; // silent
+  // 16-bit PCM WAV
+  const out = new DataView(new ArrayBuffer(44 + n * 2));
+  const text = (at: number, t: string) => [...t].forEach((ch, i) => out.setUint8(at + i, ch.charCodeAt(0)));
+  text(0, "RIFF");
+  out.setUint32(4, 36 + n * 2, true);
+  text(8, "WAVE");
+  text(12, "fmt ");
+  out.setUint32(16, 16, true);
+  out.setUint16(20, 1, true);
+  out.setUint16(22, 1, true);
+  out.setUint32(24, SOUND_RATE, true);
+  out.setUint32(28, SOUND_RATE * 2, true);
+  out.setUint16(32, 2, true);
+  out.setUint16(34, 16, true);
+  text(36, "data");
+  out.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) out.setInt16(44 + i * 2, Math.max(-1, Math.min(1, mono[i])) * 0x7fff, true);
+  return new Blob([out.buffer], { type: "audio/wav" });
+}
 
 /** a date in the file name: IMG_20120514_..., IMG-20120514-WA0001, 2012-05-14 ..., PXL_20120514... */
 export function dateFromName(name: string): string | undefined {
@@ -170,8 +213,8 @@ export async function prepare(file: File): Promise<Prepared> {
     return { date, nameDate, sha, ...t };
   }
   if (file.type.startsWith("video/")) {
-    const [date, t] = await Promise.all([videoDate(file).catch(() => undefined), videoThumb(file)]);
-    return { date, nameDate, sha, ...t };
+    const [date, t, sound] = await Promise.all([videoDate(file).catch(() => undefined), videoThumb(file), soundOf(file).catch(() => undefined)]);
+    return { date, nameDate, sha, sound, ...t };
   }
   return { sha, nameDate };
 }
