@@ -145,9 +145,11 @@ export default function SortView() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", visualDuration: 0.4, bounce: 0.1 }}
-            className="fixed inset-x-0 bottom-0 z-[75] max-h-[70svh] overflow-y-auto rounded-t-[22px] bg-paper shadow-[0_-12px_40px_-12px_rgba(70,35,45,0.35)] ring-1 ring-line"
+            className="fixed inset-x-0 bottom-0 z-[75] flex max-h-[75svh] flex-col rounded-t-[22px] bg-paper shadow-[0_-12px_40px_-12px_rgba(70,35,45,0.35)] ring-1 ring-line"
             style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
           >
+            {/* the choices scroll; who is saving and the save button always stay in view */}
+            <div className="min-h-0 flex-1 overflow-y-auto">
             <Container wide className="flex flex-col gap-5 py-5">
               <div className="flex items-center justify-between gap-3">
                 <span className="font-display text-[1.3rem] text-burgundy">{s.selected(n)}</span>
@@ -176,17 +178,21 @@ export default function SortView() {
                   setNewNames(names);
                 }}
               />
-              <label className="flex max-w-sm flex-col gap-1.5">
-                <span className="text-[1rem] text-charcoal">{s.by}</span>
-                <input value={by} onChange={(e) => setBy(e.target.value)} maxLength={80} autoComplete="name" className="rounded-xl border border-charcoal/15 bg-white px-4 py-3 text-[1rem]" />
-              </label>
-              {state.kind === "empty" && <p role="alert" className="text-burgundy">{s.empty}</p>}
-              {state.kind === "name" && <p role="alert" className="text-burgundy">{s.needName}</p>}
-              {state.kind === "failed" && <p role="alert" className="text-burgundy">{s.failed}</p>}
-              <button type="button" onClick={save} disabled={state.kind === "saving"} className={cn(buttonClass.primary, "min-h-14 w-full justify-center sm:w-fit sm:px-10")}>
-                {state.kind === "saving" ? s.saving : s.apply}
-              </button>
             </Container>
+            </div>
+            <div className="border-t border-line bg-paper">
+              <Container wide className="flex flex-col gap-2 py-3">
+                {state.kind === "empty" && <p role="alert" className="text-[0.92rem] text-burgundy">{s.empty}</p>}
+                {state.kind === "name" && <p role="alert" className="text-[0.92rem] text-burgundy">{s.needName}</p>}
+                {state.kind === "failed" && <p role="alert" className="text-[0.92rem] text-burgundy">{s.failed}</p>}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <input value={by} onChange={(e) => setBy(e.target.value)} maxLength={80} autoComplete="name" aria-label={s.by} placeholder={s.by} aria-invalid={state.kind === "name"} className="min-h-12 w-full rounded-xl border border-charcoal/15 bg-white px-4 text-[1rem] aria-[invalid=true]:border-burgundy sm:max-w-xs" />
+                  <button type="button" onClick={save} disabled={state.kind === "saving"} className={cn(buttonClass.primary, "min-h-12 w-full justify-center sm:w-fit sm:px-10")}>
+                    {state.kind === "saving" ? s.saving : s.apply}
+                  </button>
+                </div>
+              </Container>
+            </div>
           </motion.section>
         )}
       </AnimatePresence>
