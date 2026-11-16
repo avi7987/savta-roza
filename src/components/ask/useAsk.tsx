@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { useState } from "react";
-import { BookOpen, FileText, Mic, Quote, ShieldCheck } from "lucide-react";
+import { BookOpen, FileText, Mic, Network, Quote, ShieldCheck } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
 
@@ -25,7 +25,7 @@ export function useAsk() {
   return { ask, busy, res, reset: () => setRes(null) };
 }
 
-const KIND_ICON: Record<string, typeof Quote> = { fact: ShieldCheck, memory: BookOpen, note: Quote, ocr: FileText, transcript: Mic };
+const KIND_ICON: Record<string, typeof Quote> = { fact: ShieldCheck, memory: BookOpen, note: Quote, ocr: FileText, transcript: Mic, tree: Network };
 
 /** three soft dots while the answer is being written */
 export function Thinking({ label }: { label: string }) {
@@ -106,7 +106,7 @@ export function AnswerView({ res, onSource, compact }: { res: Answer; onSource?:
                   transition={{ duration: 0.6, ease, delay: sourcesAt + 0.1 + i * 0.08 }}
                 >
                   <a
-                    href={src.memoryId ? `/#m-${src.memoryId}` : "/#story"}
+                    href={src.kind === "tree" ? "/family" : src.memoryId ? `/#m-${src.memoryId}` : "/#story"}
                     onClick={onSource}
                     className="flex h-full items-start gap-3 rounded-[14px] bg-white/85 p-3 text-start ring-1 ring-line transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-[var(--shadow-paper)]"
                   >

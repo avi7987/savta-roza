@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { profile } from "@/content";
 import { rateLimited } from "@/server/auth";
 import { budgetLeft, chat } from "@/server/ai";
+import { familySummary } from "@/server/familyFacts";
 import { nearest } from "@/server/semantic";
 import { factStore, store } from "@/server/store";
 
@@ -48,11 +49,17 @@ export async function POST(req: Request) {
       };
     });
 
-  const unknown = lang === "ru" ? "На сайте пока нет ответа на этот вопрос." : "באתר עוד אין תשובה לשאלה הזו.";
-  if (!sources.length) return json({ answer: unknown, sources: [], known: false });
+  // the family tree is always one of the sources: who her children, grandchildren and great-grandchildren are
+  const tree = await familySummary(lang).catch(() => null);
+  const sourcesAll = tree
+    ? [...sources, { n: sources.length + 1, kind: "tree" as const, text: tree, memoryId: undefined, factId: undefined, title: undefined, author: undefined, photo: undefined }]
+    : sources;
 
-  const label = { fact: "verified fact", memory: "a family memory", note: "what the family told about a photo", ocr: "text read from a letter (may contain reading errors)", transcript: "transcript of a recording (may contain errors)" };
-  const context = sources.map((s) => `[${s.n}] (${label[s.kind]}${s.author ? `, by ${s.author}` : ""}) ${s.text}`).join("\n");
+  const unknown = lang === "ru" ? "На сайте пока нет ответа на этот вопрос." : "באתר עוד אין תשובה לשאלה הזו.";
+  if (!sourcesAll.length) return json({ answer: unknown, sources: [], known: false });
+
+  const label = { tree: "the family tree", fact: "verified fact", memory: "a family memory", note: "what the family told about a photo", ocr: "text read from a letter (may contain reading errors)", transcript: "transcript of a recording (may contain errors)" };
+  const context = sourcesAll.map((s) => `[${s.n}] (${label[s.kind]}${s.author ? `, by ${s.author}` : ""}) ${s.text}`).join("\n");
   const answer = await chat(
     "ask",
     [
@@ -60,7 +67,7 @@ export async function POST(req: Request) {
         role: "system",
         content: `You answer family members' questions about their grandmother Rosa${profile.birthYear ? ` (born ${profile.birthYear})` : ""} on her memorial website.
 Use ONLY the numbered sources below. Do not use any other knowledge and do not guess. If the sources do not answer the question, reply exactly: ${unknown}
-Answer in ${lang === "ru" ? "Russian" : "Hebrew"} only (translate what the sources say if they are in another language), warmly and briefly (1–4 sentences), in your own words: do not paste the sources. Refer to her as "סבתא רוזה" / "бабушка Роза". After each statement put the number of the source it comes from, like [2]. Verified facts are more reliable than memories; letters and transcripts may contain errors.
+Answer in ${lang === "ru" ? "Russian" : "Hebrew"} only (translate what the sources say if they are in another language), warmly and briefly (1–4 sentences), in your own words: do not paste the sources. Refer to her as "סבתא רוזה" / "бабушка Роза". After each statement put the number of the source it comes from, like [2]. Verified facts are more reliable than memories; letters and transcripts may contain errors. For questions about who is in the family or how many there are, use the family tree source and say it is according to the family tree on the site.
 
 Sources:
 ${context}`,
@@ -73,7 +80,9 @@ ${context}`,
   const text = answer.trim().slice(0, 2000);
   // keep only the sources the answer actually cites
   const cited = new Set([...text.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
-  const used = sources.filter((s) => cited.has(s.n));
+  // the tree is shown as a short card, not the whole text given to the model
+  const card = (s: (typeof sourcesAll)[number]) => (s.kind === "tree" ? { ...s, text: lang === "ru" ? "Семейное древо на сайте" : "עץ המשפחה באתר" } : s);
+  const used = sourcesAll.filter((s) => cited.has(s.n)).map(card);
   const known = used.length > 0 && !text.includes(unknown);
   return json({ answer: known ? text : unknown, sources: known ? used : [], known });
 }
