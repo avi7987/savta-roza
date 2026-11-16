@@ -155,7 +155,7 @@ function Browser() {
                 aria-label={g.label}
                 className={cn(paper, "scroll-mt-32 px-3 pb-8 pt-6 sm:scroll-mt-36 sm:px-10 sm:pb-12 sm:pt-9")}
               >
-                <DecadeMark className="mb-6 px-1 sm:mb-9" year={g.key === "undated" ? undefined : g.key} title={g.label} count={t.gallery.items(g.list.length)} />
+                <DecadeMark className="mb-6 px-1 sm:mb-9" year={g.key === "undated" ? undefined : g.key} title={g.label} quiet={g.key !== "undated"} count={t.gallery.items(g.list.length)} />
                 {g.key === "undated" && <p className="-mt-3 mb-6 max-w-xl px-1 text-ink-soft">{t.gallery.undatedLead}</p>}
                 <AlbumGrid photos={g.list} onOpen={openPhoto} />
               </section>

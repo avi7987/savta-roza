@@ -132,14 +132,15 @@ export function Eyebrow({ children, icon }: { children: ReactNode; icon?: ReactN
  * A decade's heading, drawn like a generation in the family tree: the year large and quiet, its
  * name, and a dotted line that draws itself across the page the first time it is seen.
  */
-export function DecadeMark({ year, title, count, as: Tag = "h2", id, className }: { year?: number | string; title: string; count?: ReactNode; as?: "h2" | "h3"; id?: string; className?: string }) {
+/** quiet: the title only says what the big year already says, so it is there for screen readers only */
+export function DecadeMark({ year, title, count, as: Tag = "h2", id, className, quiet }: { year?: number | string; title: string; count?: ReactNode; as?: "h2" | "h3"; id?: string; className?: string; quiet?: boolean }) {
   const reduce = useReducedMotion();
   return (
     <div className={cn("flex items-end gap-4 sm:gap-6", className)}>
       {year !== undefined && <span aria-hidden className="font-display text-[clamp(2.6rem,6vw,4.6rem)] leading-[0.8] tabular-nums text-[#a87482]">{year}</span>}
       <div className="flex min-w-0 flex-1 flex-col gap-2 pb-1">
         <div className="flex items-baseline justify-between gap-3">
-          <Tag id={id} className="font-display text-[clamp(1.45rem,2.6vw,1.9rem)] font-normal leading-tight text-burgundy">
+          <Tag id={id} className={quiet ? "sr-only" : "font-display text-[clamp(1.45rem,2.6vw,1.9rem)] font-normal leading-tight text-burgundy"}>
             {title}
           </Tag>
           {count && <Pill className="shrink-0 tabular-nums">{count}</Pill>}

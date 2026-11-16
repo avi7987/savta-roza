@@ -106,11 +106,11 @@ function Decade({ decade, photos, note, facts, index }: { decade: number; photos
       className="grid scroll-mt-28 gap-8 lg:grid-cols-12 lg:gap-14"
     >
       <div className={cn("flex flex-col gap-4 lg:col-span-4 lg:pt-6", flip && "lg:order-2")}>
-        <DecadeMark as="h3" year={decade} title={note?.title || label} />
+        <DecadeMark as="h3" year={decade} title={note?.title || label} quiet={!note?.title} />
         {note?.text && <p className="whitespace-pre-line text-[1.05rem] leading-[1.85] text-charcoal/85">{note.text}</p>}
         {photos.length > 0 && (
           <TLink href={`/gallery#d-${decade}`} className="w-fit text-[0.95rem] text-burgundy underline decoration-dusty/50 underline-offset-4">
-            {t.story.seeAll(photos.length, label)}
+            {t.story.seeAll(photos.length)}
           </TLink>
         )}
         {facts.length > 0 && (
