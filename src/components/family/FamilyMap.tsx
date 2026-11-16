@@ -4,12 +4,13 @@ import "@xyflow/react/dist/style.css";
 import { MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
 import { motion, useReducedMotion } from "motion/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Maximize2, Minus, Plus, RotateCcw, Search } from "lucide-react";
+import { Expand, Maximize2, Minus, Plus, RotateCcw, Search, X } from "lucide-react";
 import { ROSA } from "@/content/family";
 import { chainToRosa } from "@/lib/family";
 import { layoutFamily, type FamilyLayout } from "@/lib/familyLayout";
 import { useLang } from "@/lib/i18n";
 import { nameScore } from "@/lib/names";
+import { cn } from "../ui";
 import PersonCard, { CARD_H, CARD_W, type CardState } from "./PersonCard";
 import type { useFamily } from "./useFamily";
 
@@ -117,7 +118,9 @@ const LinesNode = memo(function LinesNode({ data }: NodeProps<Node<LinesData>>) 
 
 const nodeTypes = { person: PersonNode, lines: LinesNode };
 
-function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void; onAdd: (id: string) => void }) {
+type Props = { fam: Fam; onOpen: (id: string) => void; onAdd: (id: string) => void; phone?: boolean };
+
+function Board({ fam, onOpen, onAdd, phone = false }: Props) {
   const { t, dir, lang } = useLang();
   const m = t.family.map;
   const flow = useReactFlow();
@@ -126,6 +129,22 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
   const [q, setQ] = useState("");
   const [qOpen, setQOpen] = useState(false);
   const ready = useRef(false);
+  // on a phone the tree can take the whole screen, so a finger has room to move around it
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    if (!full) return;
+    // Escape leaves the full screen, unless it is closing a person's card on top of it
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && !document.querySelector('[aria-modal="true"]:not(.family-map)') && setFull(false);
+    window.addEventListener("keydown", esc);
+    const html = document.documentElement;
+    html.style.overflow = "hidden";
+    html.dataset.treeFull = "";
+    return () => {
+      window.removeEventListener("keydown", esc);
+      html.style.overflow = "";
+      delete html.dataset.treeFull;
+    };
+  }, [full]);
 
   const layout = useMemo(() => layoutFamily(fam.graph, { ...LAYOUT, rtl: dir === "rtl", collapsed }), [fam.graph, dir, collapsed]);
   const at = useMemo(() => new Map(layout.cards.map((c) => [c.id, c])), [layout]);
@@ -204,18 +223,19 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
   // start with the whole family in view; if that makes the cards too small, start at Rosa's
   // generation instead, with her near the top
   const start = useCallback(() => {
-    if (ready.current || !layout.cards.length) return;
+    // wait for the whole family, or the view is set for the starting tree and lands in the wrong place
+    if (ready.current || !layout.cards.length || !fam.loaded) return;
     const box = document.querySelector<HTMLElement>(".family-map")?.getBoundingClientRect();
     if (!box) return;
     ready.current = true;
     const fit = Math.min(1, (box.width * 0.9) / layout.width, (box.height * 0.85) / layout.height);
     const rosa = at.get(ROSA);
-    if (fit >= 0.55 || !rosa) flow.fitView({ padding: 0.1, maxZoom: 1 });
+    if (fit >= (phone ? 0.5 : 0.55) || !rosa) flow.fitView({ padding: 0.1, maxZoom: 1 });
     else {
-      const z = 0.75;
+      const z = phone ? 0.7 : 0.75;
       flow.setCenter(rosa.x + CARD_W / 2, rosa.y + CARD_H / 2 + (box.height / 2 - 150) / z, { zoom: z });
     }
-  }, [layout, flow, at]);
+  }, [layout, flow, at, phone, fam.loaded]);
   // only once React Flow knows its own size, or the first move is lost
   const [inited, setInited] = useState(false);
   useEffect(() => {
@@ -242,7 +262,14 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
 
   const btn = "flex h-10 w-10 items-center justify-center rounded-full text-burgundy hover:bg-blush/40 disabled:opacity-30";
   return (
-    <div className="family-map relative h-[min(78vh,52rem)] min-h-[32rem] overflow-hidden rounded-[18px] border border-line bg-[#fbf7f2]" dir="ltr">
+    <div
+      className={full ? "family-map fixed inset-0 z-[75] overflow-hidden bg-[#fbf7f2]" : cn("family-map relative overflow-hidden rounded-[18px] border border-line bg-[#fbf7f2]", phone ? "h-[72svh] min-h-[28rem]" : "h-[min(78vh,52rem)] min-h-[32rem]")}
+      style={full ? { paddingTop: "env(safe-area-inset-top, 0px)" } : undefined}
+      dir="ltr"
+      role={full ? "dialog" : undefined}
+      aria-modal={full || undefined}
+      aria-label={full ? t.family.title : undefined}
+    >
       <ReactFlow
         nodes={nodes}
         edges={[]}
@@ -262,7 +289,7 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
         proOptions={{ hideAttribution: true }}
         className="[&_.react-flow__node]:cursor-default"
       >
-        {layout.cards.length > 40 && (
+        {!phone && layout.cards.length > 40 && (
           <MiniMap
             position="bottom-left"
             pannable
@@ -277,8 +304,8 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
       </ReactFlow>
 
       {/* toolbar */}
-      <div dir={dir} className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-2">
-        <div className="pointer-events-auto relative w-[min(100%,18rem)]" lang={lang}>
+      <div dir={dir} className="pointer-events-none absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-2" style={full ? { top: "calc(0.75rem + env(safe-area-inset-top, 0px))" } : undefined}>
+        <div className={cn("pointer-events-auto relative", phone ? "min-w-[11rem] flex-1" : "w-[min(100%,18rem)]")} lang={lang}>
           <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" aria-hidden />
           <input
             value={q}
@@ -309,8 +336,19 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
           )}
         </div>
 
-        {layout.rows.length > 1 && (
-          <div role="group" aria-label={m.generations} className="pointer-events-auto flex max-w-full gap-1 overflow-x-auto rounded-full bg-white/95 p-1 shadow-[var(--shadow-paper)] ring-1 ring-line">
+        {phone && (
+          <button
+            type="button"
+            onClick={() => setFull((f) => !f)}
+            aria-label={full ? m.closeFull : m.full}
+            className="pointer-events-auto flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-white/95 px-3.5 text-[0.88rem] text-burgundy shadow-[var(--shadow-paper)] ring-1 ring-line"
+          >
+            {full ? <X className="h-4 w-4" aria-hidden /> : <Expand className="h-4 w-4" aria-hidden />}
+            {full ? null : m.full}
+          </button>
+        )}
+        {layout.rows.length > 1 && (!phone || full) && (
+          <div role="group" aria-label={m.generations} className={cn("pointer-events-auto flex max-w-full gap-1 overflow-x-auto rounded-full bg-white/95 p-1 shadow-[var(--shadow-paper)] ring-1 ring-line [scrollbar-width:none]", phone && "w-fit")}>
             {layout.rows.map((r) => (
               <button
                 key={r.level}
@@ -330,7 +368,7 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
       </div>
 
       {/* zoom controls */}
-      <div dir={dir} className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/95 p-1 shadow-[var(--shadow-paper)] ring-1 ring-line">
+      <div dir={dir} className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/95 p-1 shadow-[var(--shadow-paper)] ring-1 ring-line" style={full ? { bottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))" } : undefined}>
         <button type="button" onClick={() => flow.zoomOut({ duration: 300 })} aria-label={t.family.zoomOut} className={btn}>
           <Minus className="h-4 w-4" aria-hidden />
         </button>
@@ -338,7 +376,7 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
           <Plus className="h-4 w-4" aria-hidden />
         </button>
         <span aria-hidden className="mx-1 h-5 w-px bg-line" />
-        <button type="button" onClick={() => flow.fitView({ padding: 0.12, duration: 600 })} className="flex h-10 items-center gap-1.5 rounded-full px-3 text-[0.88rem] text-burgundy hover:bg-blush/40">
+        <button type="button" onClick={() => flow.fitView({ padding: 0.12, duration: 600 })} className="flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[0.88rem] text-burgundy hover:bg-blush/40">
           <Maximize2 className="h-4 w-4" aria-hidden />
           {m.fit}
         </button>
@@ -349,21 +387,23 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
             setCollapsed(new Set());
             setTimeout(() => centerOn(ROSA, 0.9), 50);
           }}
-          className="flex h-10 items-center gap-1.5 rounded-full px-3 text-[0.88rem] text-burgundy hover:bg-blush/40"
+          className="flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[0.88rem] text-burgundy hover:bg-blush/40"
         >
           <RotateCcw className="h-4 w-4" aria-hidden />
           {m.reset}
         </button>
       </div>
-      <p dir={dir} className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 whitespace-nowrap text-[0.78rem] text-ink-soft/80">
-        {m.hint}
-      </p>
+      {!phone && (
+        <p dir={dir} className="pointer-events-none absolute bottom-16 left-1/2 -translate-x-1/2 whitespace-nowrap text-[0.78rem] text-ink-soft/80">
+          {m.hint}
+        </p>
+      )}
     </div>
   );
 }
 
 /** The whole family as one map: one row per generation, every card the same size. */
-export default function FamilyMap(props: { fam: Fam; onOpen: (id: string) => void; onAdd: (id: string) => void }) {
+export default function FamilyMap(props: Props) {
   return (
     <ReactFlowProvider>
       <Board {...props} />

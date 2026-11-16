@@ -27,6 +27,8 @@ export function useFamily() {
   const { lang, t } = useLang();
   const [approved, setApproved] = useState<TreePerson[]>([]);
   const [local, setLocal] = useState<LocalEntry[]>([]);
+  // the people added on the site have arrived (until then only the starting tree is known)
+  const [loaded, setLoaded] = useState(STATIC);
   const { photos: real } = usePhotos();
 
   useEffect(() => {
@@ -37,7 +39,8 @@ export function useFamily() {
       fetch("/api/family")
         .then((r) => (r.ok ? r.json() : { people: [] }))
         .then((d) => setApproved(d.people ?? []))
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setLoaded(true));
     }
     return () => window.removeEventListener("storage", sync);
   }, []);
@@ -98,5 +101,5 @@ export function useFamily() {
     [nameOf]
   );
 
-  return { graph, photos, relLabel, nameOf, optionLabel, addLocal };
+  return { graph, photos, relLabel, nameOf, optionLabel, addLocal, loaded };
 }

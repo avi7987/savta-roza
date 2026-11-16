@@ -180,3 +180,8 @@ html.lenis, html.lenis body { height: auto; }
   .family-map .react-flow__node-person { transition: none; animation: none; }
   .family-map .card-pop { animation: none; }
 }
+
+/* the family tree on the whole screen: the site's bars step aside */
+html[data-tree-full] .hide-under-tree { display: none; }
+html[data-tree-full] main,
+html[data-tree-full] #family { z-index: 75; }

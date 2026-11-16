@@ -38,7 +38,7 @@ export default function PhoneTabs() {
     <motion.nav
       layoutRoot
       aria-label={t.tabs.label}
-      className="fixed inset-x-0 bottom-0 z-[70] border-t border-line bg-paper/95 backdrop-blur-md md:hidden"
+      className="hide-under-tree fixed inset-x-0 bottom-0 z-[70] border-t border-line bg-paper/95 backdrop-blur-md md:hidden"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)", paddingLeft: "env(safe-area-inset-left, 0px)", paddingRight: "env(safe-area-inset-right, 0px)" }}
     >
       <ul className="mx-auto grid max-w-md grid-cols-5">

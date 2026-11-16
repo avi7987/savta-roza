@@ -14,12 +14,11 @@ import Portal from "../Portal";
 import { getLenis } from "../Transition";
 import { Container, PlaceholderTag, SectionIntro, buttonClass, cn } from "../ui";
 import AddPersonForm, { type AddPreset } from "./AddPersonForm";
-import FamilyFocus from "./FamilyFocus";
 import PersonAvatar from "./PersonAvatar";
 import { useFamily } from "./useFamily";
 
-// the interactive map is only loaded on wider screens
-const FamilyMap = dynamic(() => import("./FamilyMap"), { ssr: false, loading: () => <div className="h-[min(78vh,52rem)] min-h-[32rem] rounded-[18px] border border-line bg-[#fbf7f2]" /> });
+// the tree is drawn in the browser only (it measures the screen)
+const FamilyMap = dynamic(() => import("./FamilyMap"), { ssr: false, loading: () => <div className="h-[72svh] min-h-[28rem] rounded-[18px] border border-line bg-[#fbf7f2] md:h-[min(78vh,52rem)] md:min-h-[32rem]" /> });
 
 type Fam = ReturnType<typeof useFamily>;
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -265,9 +264,9 @@ export default function FamilyTree() {
     <section id="family" aria-labelledby="family-title" className="py-[var(--spacing-section)]">
       <Container wide>
         <SectionIntro id="family-title" eyebrow={t.family.eyebrow} title={t.family.title} lead={t.family.map.lead} layout="center" />
-        <div className="mt-12">
-          {wide === true && <FamilyMap fam={fam} onOpen={onOpen} onAdd={(id) => onAdd({ of: id })} />}
-          {wide === false && <FamilyFocus fam={fam} onOpen={onOpen} onAdd={(id) => onAdd({ of: id })} />}
+        <div className="mt-8 md:mt-12">
+          {wide !== null && <FamilyMap phone={!wide} fam={fam} onOpen={onOpen} onAdd={(id) => onAdd({ of: id })} />}
+          {wide === false && <p className="mt-2.5 text-center text-[0.82rem] text-ink-soft">{t.family.map.hintTouch}</p>}
         </div>
         <div className="mt-10 flex flex-col items-center gap-3 text-center">
           <button type="button" onClick={() => onAdd({})} className={buttonClass.primary}>

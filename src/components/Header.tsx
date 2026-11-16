@@ -104,7 +104,7 @@ export default function Header() {
       </a>
       <header
         className={cn(
-          "fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-500",
+          "hide-under-tree fixed inset-x-0 top-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-500",
           scrolled ? "bg-ivory/90 shadow-[0_1px_0_var(--color-line)] backdrop-blur-md" : "bg-transparent"
         )}
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
