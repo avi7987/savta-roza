@@ -62,19 +62,49 @@ export function AnswerView({ res, onSource, compact }: { res: Answer; onSource?:
       );
     });
 
+  // the answer unfolds a paragraph (or, in a single paragraph, a sentence) at a time; its sources come last
+  const paras = res.answer.split(/\n+/).map((x) => x.trim()).filter(Boolean);
+  const pieces = paras.length > 1 ? paras : res.answer.match(/[^.!?]+[.!?]+(?:\s*\[\d+\](?:,?\s*\[\d+\])*)?\s*|[^.!?]+$/g) ?? [res.answer];
+  const STEP = 0.22;
+  const sourcesAt = 0.25 + pieces.length * STEP;
+  const textClass = compact ? "font-display text-[1.25rem] leading-relaxed text-charcoal" : "text-center font-display text-[clamp(1.3rem,2.4vw,1.75rem)] leading-relaxed text-charcoal";
+
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }} className="flex flex-col gap-5">
-      <p dir="auto" className={compact ? "font-display text-[1.25rem] leading-relaxed text-charcoal" : "text-center font-display text-[clamp(1.3rem,2.4vw,1.75rem)] leading-relaxed text-charcoal"}>
-        {render(res.answer)}
-      </p>
+      {paras.length > 1 ? (
+        <div className="flex flex-col gap-3">
+          {pieces.map((para, i) => (
+            <motion.p key={i} dir="auto" className={textClass} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease, delay: 0.15 + i * STEP }}>
+              {render(para)}
+            </motion.p>
+          ))}
+        </div>
+      ) : (
+        <p dir="auto" className={textClass}>
+          {pieces.map((piece, i) => (
+            <motion.span key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.7, ease, delay: 0.15 + i * STEP }}>
+              {render(piece)}
+            </motion.span>
+          ))}
+        </p>
+      )}
       {res.sources.length > 0 && (
         <div className="flex flex-col gap-2">
-          <span className={compact ? "label" : "label text-center"}>{s.sources}</span>
+          <motion.span className={compact ? "label" : "label text-center"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: sourcesAt }}>
+            {s.sources}
+          </motion.span>
           <ul className={compact ? "flex flex-col gap-2" : "-mx-2 flex snap-x gap-3 overflow-x-auto px-2 pb-2 sm:flex-wrap sm:justify-center sm:overflow-visible"}>
-            {res.sources.map((src) => {
+            {res.sources.map((src, i) => {
               const Icon = KIND_ICON[src.kind] ?? Quote;
               return (
-                <li key={src.n} id={`ask-src-${src.n}`} className={compact ? "" : "w-[17rem] shrink-0 snap-start"}>
+                <motion.li
+                  key={src.n}
+                  id={`ask-src-${src.n}`}
+                  className={compact ? "" : "w-[17rem] shrink-0 snap-start"}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, ease, delay: sourcesAt + 0.1 + i * 0.08 }}
+                >
                   <a
                     href={src.memoryId ? `/#m-${src.memoryId}` : "/#story"}
                     onClick={onSource}
@@ -99,7 +129,7 @@ export function AnswerView({ res, onSource, compact }: { res: Answer; onSource?:
                       </span>
                     </span>
                   </a>
-                </li>
+                </motion.li>
               );
             })}
           </ul>

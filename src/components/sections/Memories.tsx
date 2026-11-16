@@ -1,7 +1,7 @@
 "use client";
 
-import { motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionStyle } from "motion/react";
+import { useEffect, useState, type PointerEvent } from "react";
 import { Mic, Video } from "lucide-react";
 import { photoById } from "@/content";
 import type { Memory } from "@/content/types";
@@ -30,6 +30,24 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
   const withPhoto = !!(photo || m.photoSrc);
   const tone = index % 3 === 1 ? "bg-[#fbf3f1]" : "bg-white";
 
+  // with a mouse, the card leans a little toward it, like a photo held in the hand, and its shadow moves the other way
+  const reduce = useReducedMotion();
+  const tiltX = useMotionValue(0);
+  const tiltY = useMotionValue(0);
+  const rotateX = useSpring(tiltX, { stiffness: 150, damping: 20 });
+  const rotateY = useSpring(tiltY, { stiffness: 150, damping: 20 });
+  const shadow = useTransform(() => `${(-rotateY.get() * 3).toFixed(1)}px ${(14 + rotateX.get() * 3).toFixed(1)}px 34px -18px rgba(70,35,45,${(Math.abs(rotateX.get()) + Math.abs(rotateY.get())) * 0.07})`);
+  const lean = (e: PointerEvent<HTMLElement>) => {
+    if (reduce || e.pointerType !== "mouse") return;
+    const r = e.currentTarget.getBoundingClientRect();
+    tiltY.set(((e.clientX - r.left) / r.width - 0.5) * 6);
+    tiltX.set(-((e.clientY - r.top) / r.height - 0.5) * 6);
+  };
+  const rest = () => {
+    tiltX.set(0);
+    tiltY.set(0);
+  };
+
   return (
     <motion.article
       id={m.placeholder ? undefined : `m-${m.id}`}
@@ -37,11 +55,16 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "0px 0px -8% 0px" }}
       transition={{ duration: 0.8, ease, delay: (index % 3) * 0.08 }}
+      whileHover={reduce ? undefined : { y: -4, transition: { type: "spring", visualDuration: 0.35, bounce: 0 } }}
+      onPointerMove={lean}
+      onPointerLeave={rest}
+      style={{ rotateX, rotateY, transformPerspective: 1100 } as MotionStyle}
       className={cn(
-        "group relative mb-8 flex scroll-mt-28 break-inside-avoid flex-col rounded-[var(--radius-card)] p-6 shadow-[var(--shadow-paper)] ring-1 ring-charcoal/[0.04] transition-[transform,box-shadow] duration-500 hover:-translate-y-1 hover:shadow-[var(--shadow-lift)] sm:p-8",
+        "group relative mb-8 flex scroll-mt-28 break-inside-avoid flex-col rounded-[var(--radius-card)] p-6 shadow-[var(--shadow-paper)] ring-1 ring-charcoal/[0.04] transition-shadow duration-500 hover:shadow-[var(--shadow-lift)] sm:p-8",
         tone
       )}
     >
+      <motion.span aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit]" style={{ boxShadow: shadow }} />
       {m.placeholder && <span className="mb-3 text-[0.72rem] tracking-wide text-rose">{t.memories.example}</span>}
 
       {withPhoto && (

@@ -2,7 +2,8 @@
 
 import "@xyflow/react/dist/style.css";
 import { MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Maximize2, Minus, Plus, RotateCcw, Search } from "lucide-react";
 import { ROSA } from "@/content/family";
 import { chainToRosa } from "@/lib/family";
@@ -23,14 +24,17 @@ export function immediateFamily(fam: Fam, id: string) {
   return new Set([id, ...g.realParentsOf(id), ...g.partnersOf(id), ...g.siblingsOf(id), ...g.childrenOf(id)]);
 }
 
-type PersonData = { id: string; state: CardState; onOpen: (id: string) => void; onAdd: (id: string) => void; fold?: { folded: boolean; hidden: number; toggle: () => void }; fam: Fam };
-type LinesData = { layout: FamilyLayout; lit: Set<string> | null; path: string[]; fam: Fam; labels: { y: number; text: string }[]; rtl: boolean };
+/** a card just let out of a folded branch: where the pile was, relative to it, and when its turn comes */
+type Appear = { dx: number; dy: number; delay: number };
+type PersonData = { id: string; state: CardState; onOpen: (id: string) => void; onAdd: (id: string) => void; fold?: { folded: boolean; hidden: number; toggle: () => void }; fam: Fam; appear?: Appear };
+type LinesData = { layout: FamilyLayout; lit: Set<string> | null; path: string[]; fam: Fam; labels: { y: number; text: string }[]; rtl: boolean; selected: string | null };
 
 const PersonNode = memo(function PersonNode({ data }: NodeProps<Node<PersonData>>) {
   const { fam, id } = data;
   const p = fam.graph.byId.get(id)!;
+  const a = data.appear;
   return (
-    <div dir="auto">
+    <div dir="auto" className={a ? "card-pop" : undefined} style={a ? ({ "--dx": `${a.dx}px`, "--dy": `${a.dy}px`, animationDelay: `${a.delay}ms` } as CSSProperties) : undefined}>
       <PersonCard person={p} name={fam.nameOf(id)} relation={fam.relLabel(id)} state={data.state} onOpen={() => data.onOpen(id)} onAdd={p.placeholder ? undefined : () => data.onAdd(id)} fold={data.fold} />
     </div>
   );
@@ -38,7 +42,8 @@ const PersonNode = memo(function PersonNode({ data }: NodeProps<Node<PersonData>
 
 /** all the lines in one drawing, underneath the cards, with the generations named at the side */
 const LinesNode = memo(function LinesNode({ data }: NodeProps<Node<LinesData>>) {
-  const { layout, lit, path, fam, labels, rtl } = data;
+  const { layout, lit, path, fam, labels, rtl, selected } = data;
+  const reduce = useReducedMotion();
   const virtual = (p: string) => !!fam.graph.byId.get(p)?.virtual;
   // a line is on the way to Rosa when it joins two neighbours in the chain
   const steps = new Set(path.slice(1).map((p, i) => [p, path[i]].sort().join("|")));
@@ -52,6 +57,10 @@ const LinesNode = memo(function LinesNode({ data }: NodeProps<Node<LinesData>>) 
     const real = people.filter((p) => !virtual(p));
     return real.length > 0 && real.every((p) => lit.has(p));
   };
+  // how many steps from Rosa a line starts, so the way to the chosen person is drawn from her outward
+  const fromRosa = new Map(path.map((p, i) => [p, i]));
+  const rosaAt = fromRosa.get(ROSA) ?? 0;
+  const stepOf = (people: string[]) => Math.min(...people.filter((p) => fromRosa.has(p)).map((p) => Math.abs(fromRosa.get(p)! - rosaAt)));
   const w = layout.width + BAND;
   const x0 = rtl ? 0 : -BAND;
   return (
@@ -66,21 +75,39 @@ const LinesNode = memo(function LinesNode({ data }: NodeProps<Node<LinesData>>) 
       ))}
       {layout.connectors.map((c) => {
         const route = path.length > 1 && onPath(c.people);
-        const fam_ = inFamily(c.people);
+        const fam_ = route || inFamily(c.people);
         return (
           <path
             key={c.id}
             d={c.d}
             fill="none"
-            stroke={route ? "var(--color-rose)" : fam_ ? "var(--color-dusty)" : c.kind === "couple" ? "var(--color-dusty)" : "var(--color-rail)"}
-            strokeWidth={route ? 3.2 : fam_ ? 2.2 : c.kind === "couple" ? 2 : 1.7}
-            strokeOpacity={lit && !route && !fam_ ? 0.3 : 1}
+            stroke={fam_ ? "var(--color-dusty)" : c.kind === "couple" ? "var(--color-dusty)" : "var(--color-rail)"}
+            strokeWidth={fam_ ? 2.2 : c.kind === "couple" ? 2 : 1.7}
+            strokeOpacity={lit && !fam_ ? 0.3 : 1}
             strokeLinejoin="round"
             strokeLinecap="round"
             style={{ transition: "stroke 0.3s, stroke-opacity 0.3s, stroke-width 0.3s" }}
           />
         );
       })}
+      {/* the way from Rosa to the chosen person, drawn in rose one step after another */}
+      {path.length > 1 &&
+        layout.connectors
+          .filter((c) => onPath(c.people))
+          .map((c) => (
+            <motion.path
+              key={`${selected}-${c.id}`}
+              d={c.d}
+              fill="none"
+              stroke="var(--color-rose)"
+              strokeWidth={3.2}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              initial={reduce ? false : { pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ pathLength: { duration: 0.45, ease: [0.4, 0, 0.2, 1], delay: 0.15 + stepOf(c.people) * 0.32 }, opacity: { duration: 0.01, delay: 0.15 + stepOf(c.people) * 0.32 } }}
+            />
+          ))}
       {layout.junctions.map((j) => (
         <circle key={j.id} cx={j.x} cy={j.y} r={5} fill="var(--color-paper)" stroke="var(--color-rail)" strokeWidth={1.6} strokeDasharray="2 2" />
       ))}
@@ -106,12 +133,31 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
   const lit = useMemo(() => (selected && at.has(selected) ? new Set([...immediateFamily(fam, selected), ...path]) : null), [fam, selected, at, path]);
   const labels = useMemo(() => layout.rows.map((r) => ({ y: r.y, text: m.gen(r.level) })), [layout, m]);
 
+  // a branch being opened: its people come out of the pile one after another
+  const unfolding = useRef<string | null>(null);
   const toggle = useCallback((id: string) => setCollapsed((cur) => {
     const next = new Set(cur);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
+    if (next.has(id)) {
+      next.delete(id);
+      unfolding.current = id;
+    } else next.add(id);
     return next;
   }), []);
+  const shownBefore = useRef<Set<string>>(new Set());
+  const appear = useMemo(() => {
+    const out = new Map<string, Appear>();
+    const from = unfolding.current ? layout.cards.find((c) => c.id === unfolding.current) : undefined;
+    if (!from) return out;
+    const fresh = layout.cards.filter((c) => !shownBefore.current.has(c.id));
+    fresh
+      .sort((a, b) => a.level - b.level || Math.abs(a.x - from.x) - Math.abs(b.x - from.x))
+      .forEach((c, i) => out.set(c.id, { dx: from.x - c.x, dy: from.y - c.y, delay: 120 + Math.min(i, 12) * 70 }));
+    return out;
+  }, [layout]);
+  useEffect(() => {
+    shownBefore.current = new Set(layout.cards.map((c) => c.id));
+    unfolding.current = null;
+  }, [layout]);
 
   const open = useCallback((id: string) => {
     setSelected(id);
@@ -119,7 +165,7 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
   }, [onOpen]);
 
   const nodes = useMemo<Node[]>(() => {
-    const list: Node[] = [{ id: "__lines", type: "lines", position: { x: 0, y: 0 }, data: { layout, lit, path, fam, labels, rtl: dir === "rtl" }, draggable: false, selectable: false, focusable: false, zIndex: 0, width: layout.width, height: layout.height, style: { pointerEvents: "none" } }];
+    const list: Node[] = [{ id: "__lines", type: "lines", position: { x: 0, y: 0 }, data: { layout, lit, path, fam, labels, rtl: dir === "rtl", selected }, draggable: false, selectable: false, focusable: false, zIndex: 0, width: layout.width, height: layout.height, style: { pointerEvents: "none" } }];
     for (const c of layout.cards) {
       const hasKids = fam.graph.childrenOf(c.id).length > 0 || c.hidden > 0;
       list.push({
@@ -140,11 +186,12 @@ function Board({ fam, onOpen, onAdd }: { fam: Fam; onOpen: (id: string) => void;
           onOpen: open,
           onAdd,
           fold: hasKids && c.id !== ROSA ? { folded: collapsed.has(c.id), hidden: c.hidden, toggle: () => toggle(c.id) } : undefined,
+          appear: appear.get(c.id),
         } satisfies PersonData,
       });
     }
     return list;
-  }, [layout, lit, path, labels, dir, fam, selected, open, onAdd, collapsed, toggle]);
+  }, [layout, lit, path, labels, dir, fam, selected, open, onAdd, collapsed, toggle, appear]);
 
   const centerOn = useCallback(
     (id: string, zoom?: number) => {

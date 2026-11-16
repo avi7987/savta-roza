@@ -96,7 +96,12 @@ export default function AskRosa() {
             </div>
           )}
           {res && (
-            <div className="mt-6 flex flex-col items-center gap-5 rounded-[24px] bg-white/60 p-6 ring-1 ring-white sm:p-8">
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.985 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", visualDuration: 0.5, bounce: 0 }}
+              className="mt-6 flex flex-col items-center gap-5 rounded-[24px] bg-white/60 p-6 ring-1 ring-white sm:p-8"
+            >
               <AnswerView res={res} />
               <button
                 type="button"
@@ -109,7 +114,7 @@ export default function AskRosa() {
               >
                 {s.another}
               </button>
-            </div>
+            </motion.div>
           )}
         </div>
         <p className="text-[0.78rem] text-ink-soft/80">{s.askHint}</p>

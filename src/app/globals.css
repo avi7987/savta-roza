@@ -167,6 +167,16 @@ html.lenis, html.lenis body { height: auto; }
   from { opacity: 0; }
   to { opacity: 1; }
 }
+/* a card let out of a folded branch slides out from under the pile, in its turn */
+.family-map .card-pop {
+  animation: card-pop 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes card-pop {
+  from { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.92); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
 @media (prefers-reduced-motion: reduce) {
   .family-map .react-flow__node-person { transition: none; animation: none; }
+  .family-map .card-pop { animation: none; }
 }

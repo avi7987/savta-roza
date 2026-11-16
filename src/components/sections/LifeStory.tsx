@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useInView, useReducedMotion, useScroll, useSpring, useTransform } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Play } from "lucide-react";
 import type { Photo } from "@/content/types";
@@ -90,6 +90,10 @@ function Decade({ decade, photos, note, facts, index }: { decade: number; photos
   const label = decadeLabel(decade, lang);
   const approx = photos.some((p) => isEstimate(p.when));
   const flip = index % 2 === 1;
+  // depth: while the decade passes through the screen, its photos drift a little behind the words
+  const reduce = useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+  const drift = useSpring(useTransform(scrollYProgress, [0, 1], reduce ? [0, 0] : [36, -36]), { stiffness: 120, damping: 30, restDelta: 0.1 });
 
   return (
     <motion.article
@@ -133,7 +137,8 @@ function Decade({ decade, photos, note, facts, index }: { decade: number; photos
       </div>
 
       {shown.length > 0 && (
-        <div
+        <motion.div
+          style={{ y: drift }}
           className={cn(
             "grid gap-3 sm:gap-4 lg:col-span-8",
             shown.length <= 2 && (shown.length === 1 ? "grid-cols-1" : "grid-cols-2"),
@@ -153,7 +158,7 @@ function Decade({ decade, photos, note, facts, index }: { decade: number; photos
               <Tile photo={p} label={`${t.gallery.open} · ${label}`} onOpen={() => open(photos, Math.max(0, photos.findIndex((x) => x.id === p.id)))} />
             </div>
           ))}
-        </div>
+        </motion.div>
       )}
     </motion.article>
   );
