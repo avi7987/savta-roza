@@ -47,8 +47,9 @@ export type DeleteRequest = { at: string; reason?: string; by?: string };
 export type Base = { id: string; status: Status; files: StoredFile[]; createdAt: string; reviewedAt?: string };
 
 /** what kind of thing was shared, as chosen in the "add a memory" steps */
-export type MemoryType = "photos" | "video" | "audio" | "story" | "letter" | "recipe";
-export const MEMORY_TYPES: MemoryType[] = ["photos", "video", "audio", "story", "letter", "recipe"];
+/** "words": things she used to say (also used for answers in her voice) */
+export type MemoryType = "photos" | "video" | "audio" | "story" | "letter" | "recipe" | "words";
+export const MEMORY_TYPES: MemoryType[] = ["photos", "video", "audio", "story", "letter", "recipe", "words"];
 
 export type StoredMemory = Base & {
   type?: MemoryType;

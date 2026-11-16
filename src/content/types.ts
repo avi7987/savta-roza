@@ -100,6 +100,8 @@ export type Milestone = {
 
 export type Memory = {
   id: string;
+  /** what kind of thing was shared ("words" = things she used to say) */
+  type?: string;
   author: string;
   relation?: string;
   title?: string;

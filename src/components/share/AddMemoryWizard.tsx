@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, Camera, ChefHat, FileAudio, FileVideo, Images, Mail, Mic, PenLine, Square, Upload, Video, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, ChefHat, FileAudio, FileVideo, Images, Lightbulb, Mail, MessageCircleHeart, Mic, PenLine, Square, Upload, Video, X } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { ACCEPT, LIMITS, kindOf, maxBytes } from "@/lib/limits";
 import { ease } from "@/lib/motion";
@@ -13,8 +13,8 @@ import { STATIC } from "../Transition";
 import { buttonClass, cn } from "../ui";
 import PeoplePicker, { refreshNames, usePeople } from "../people/PeoplePicker";
 
-type MType = "photos" | "video" | "audio" | "story" | "letter" | "recipe";
-type TextType = "story" | "letter" | "recipe";
+type MType = "photos" | "video" | "audio" | "story" | "letter" | "recipe" | "words" | "info";
+type TextType = "story" | "letter" | "recipe" | "words" | "info";
 type Dup = { match: "exact" | "similar"; status: "approved" | "pending" } | "local";
 type Picked = { file: File; url?: string; kind: "image" | "video" | "audio"; prep?: Prepared; preparing?: boolean; dup?: Dup | null };
 type WhenMode = "unknown" | "date" | "year" | "decade";
@@ -27,8 +27,12 @@ const TYPES: { id: MType; Icon: typeof Images }[] = [
   { id: "story", Icon: PenLine },
   { id: "letter", Icon: Mail },
   { id: "recipe", Icon: ChefHat },
+  { id: "words", Icon: MessageCircleHeart },
+  { id: "info", Icon: Lightbulb },
 ];
-const isText = (t: MType | null): t is TextType => t === "story" || t === "letter" || t === "recipe";
+const isText = (t: MType | null): t is TextType => t === "story" || t === "letter" || t === "recipe" || t === "words" || t === "info";
+/** short kinds: just the words and who is telling; no files, dates or tags */
+const isShort = (t: MType | null) => t === "words" || t === "info";
 const DECADES = [1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
 const DRAFT = "roza-draft-v1";
 const NAME = "roza-my-name";
@@ -305,7 +309,8 @@ export default function AddMemoryWizard() {
   const go = (n: number) => {
     if (n > step && step === 1 && !checkContent()) return;
     setErrors({});
-    setStep(n);
+    // words and details about her have no "when / who is in it" step
+    setStep(isShort(type) && n === 2 ? (n > step ? 3 : 1) : n);
   };
 
   const reset = () => {
@@ -342,6 +347,19 @@ export default function AddMemoryWizard() {
     setProgress(0);
     if (STATIC) {
       setTimeout(() => setState("done"), 700);
+      return;
+    }
+    // a detail about her waits for the owner's check, as a suggested fact
+    if (type === "info") {
+      fetch("/api/facts/suggest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer: values.memory.trim(), by: values.name.trim(), website: trap.current?.value ?? "" }) })
+        .then((r) => {
+          if (!r.ok) return setState("error");
+          try {
+            localStorage.removeItem(DRAFT);
+          } catch {}
+          setState("done");
+        })
+        .catch(() => setState("error"));
       return;
     }
     const fd = new FormData();
@@ -395,8 +413,8 @@ export default function AddMemoryWizard() {
     return (
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease }} className="flex flex-col items-center gap-5 py-10 text-center" role="status">
         <RoseTop className="h-24 w-24" />
-        <h2 className="font-display text-[clamp(2rem,4vw,2.8rem)] font-light text-burgundy">{s.doneTitle}</h2>
-        <p className="max-w-md text-lg text-ink-soft">{s.doneLead}</p>
+        <h2 className="font-display text-[clamp(2rem,4vw,2.8rem)] font-light text-burgundy">{type === "info" ? s.doneInfoTitle : s.doneTitle}</h2>
+        <p className="max-w-md text-lg text-ink-soft">{type === "info" ? s.doneInfo : type === "words" ? s.doneWords : s.doneLead}</p>
         {STATIC && <p className="max-w-md text-[0.88rem] text-rose">{s.demoNote}</p>}
         {skipped > 0 && <p className="max-w-md text-[0.92rem] text-ink-soft">{s.skipped(skipped)}</p>}
         <button type="button" onClick={reset} className={cn(buttonClass.secondary, "mt-4")}>
@@ -606,9 +624,20 @@ export default function AddMemoryWizard() {
           {heading(type ? w.types[type][0] : w.steps[1])}
           {isText(type) ? (
             <>
-              {titleField(w.titles[type], w.titlePhs[type])}
-              {textField(w.bodies[type], w.bodyPhs[type], 8)}
-              {fileArea(ACCEPT.image.join(","), w.attachScan[type])}
+              {type === "words" ? (
+                <>
+                  {textField(w.bodies[type], w.bodyPhs[type], 3)}
+                  {titleField(w.titles[type], w.titlePhs[type])}
+                </>
+              ) : type === "info" ? (
+                textField(w.bodies[type], w.bodyPhs[type], 3)
+              ) : (
+                <>
+                  {titleField(w.titles[type], w.titlePhs[type])}
+                  {textField(w.bodies[type], w.bodyPhs[type], 8)}
+                  {fileArea(ACCEPT.image.join(","), w.attachScan[type])}
+                </>
+              )}
             </>
           ) : (
             <>

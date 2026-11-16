@@ -4,7 +4,7 @@ import { rateLimited } from "@/server/auth";
 import { budgetLeft, chat } from "@/server/ai";
 import { familySummary } from "@/server/familyFacts";
 import { nearest } from "@/server/semantic";
-import { getVoice } from "@/server/voice";
+import { voiceForAnswers } from "@/server/voice";
 import { factStore, store } from "@/server/store";
 
 export const runtime = "nodejs";
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
   const label = { tree: "the family tree", fact: "verified fact", memory: "a family memory", note: "what the family told about a photo", ocr: "text read from a letter (may contain reading errors)", transcript: "transcript of a recording (may contain errors)" };
   const context = sourcesAll.map((s) => `[${s.n}] (${label[s.kind]}${s.author ? `, by ${s.author}` : ""}) ${s.text}`).join("\n");
-  const voice = await getVoice();
+  const voice = await voiceForAnswers();
   const answer = await chat(
     "ask",
     [

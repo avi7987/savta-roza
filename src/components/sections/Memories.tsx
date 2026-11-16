@@ -67,6 +67,17 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
       <motion.span aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit]" style={{ boxShadow: shadow }} />
       {m.placeholder && <span className="mb-3 text-[0.72rem] tracking-wide text-rose">{t.memories.example}</span>}
 
+      {/* her own words: what she said, large, and what it meant underneath */}
+      {m.type === "words" ? (
+        <>
+          <span className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full bg-blush/60 px-3 py-1 text-[0.78rem] text-burgundy">{t.memories.herWords}</span>
+          <p dir="auto" className="whitespace-pre-line font-display text-[1.6rem] leading-[1.45] text-burgundy">
+            &ldquo;{m.body.trim()}&rdquo;
+          </p>
+          {m.title && <p dir="auto" className="mt-3 text-[1rem] leading-relaxed text-charcoal/80">{m.title}</p>}
+        </>
+      ) : (
+      <>
       {/* words alone open with a quiet quotation mark */}
       {!withPhoto && !m.mediaKind && <span aria-hidden className="-mb-3 -mt-1 font-display text-[3.4rem] leading-none text-blush">&rdquo;</span>}
 
@@ -86,6 +97,8 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
       {body?.trim() && <p lang={foreign && !original ? lang : m.lang} className={cn("text-[1.05rem] leading-[1.85] text-charcoal/90", !withPhoto && !m.title && "font-display text-[1.35rem] leading-[1.6] text-charcoal")}>
         {body}
       </p>}
+      </>
+      )}
 
       {m.mediaKind === "audio" && m.mediaSrc && <AudioPlayer src={m.mediaSrc} title={m.title || m.author} className="mt-5" />}
       {m.mediaKind === "video" && m.mediaSrc && (
