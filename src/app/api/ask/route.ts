@@ -9,6 +9,9 @@ import { factStore, store } from "@/server/store";
 
 export const runtime = "nodejs";
 
+/** the model starts a reply with this when the message was a feeling and not a question */
+const FEELING = "[[FEELING]]";
+
 const json = (b: unknown, status = 200) => NextResponse.json(b, { status, headers: { "Cache-Control": "no-store" } });
 
 /**
@@ -83,6 +86,13 @@ WHAT YOU MAY SAY (this matters more than anything)
 - When a source names people, name exactly them. Answer only what was asked; ignore sources about something else.
 - After each fact put the number of its source, like [2]. Verified facts are the most reliable; letters and transcripts may contain errors.
 - If the sources do not answer the question, reply exactly: ${unknown}
+
+WHEN IT IS NOT A QUESTION
+Sometimes a grandchild writes a feeling, not a question: "I miss you", "I love you", "thank you", "today is your birthday", "I wish you were here", a greeting or a few words of grief. Then:
+- Begin your reply with the mark ${FEELING} and then answer from the heart, as their grandmother: gently, lovingly, 1–3 short sentences. You may say you love them and miss them too, and invite them to share a memory of you.
+- Do not answer "nobody told me", do not cite sources and do not state any fact about your life.
+- Do not make claims about where you are now or about an afterlife, and make no promises.
+- If the words suggest the person is in real distress or danger (not ordinary longing), say with love that it is important to talk to someone close to them now${lang === "he" ? ', or to call ער"ן at 1201, any hour' : ""}.
 ${phrase ? `
 ONE OF YOUR OWN EXPRESSIONS
 The family remembers that you used to say: "${phrase}". If it fits this answer naturally, use it once, the way you would have said it (keep the expression as written). If it does not fit, leave it out. Never explain it and never use it as a fact.
@@ -102,7 +112,14 @@ ${context}`,
     { maxTokens: 400, temperature: 0.45, model: MODELS.voice }
   );
   if (answer === null) return json({ error: "unavailable" }, 503);
-  const text = answer.trim().slice(0, 2000);
+  let text = answer.trim().slice(0, 2000);
+  // a feeling, not a question: a tender reply, with no sources and no "nobody told me"
+  // (also when the mark was forgotten: no question asked, nothing cited, and not "nobody told me")
+  const looksLikeFeeling = !/[?？]/.test(q) && !/\[\d+\]/.test(text) && !text.includes(unknown) && !/לא סיפרו לי|не рассказал/i.test(text);
+  if (/\[\[?\s*FEELING\s*\]?\]/i.test(text) || looksLikeFeeling) {
+    text = text.replace(/\[\[?\s*FEELING\s*\]?\]/gi, "").replace(/\[\d+\]/g, "").trim();
+    if (text) return json({ answer: text, sources: [], known: true, feeling: true });
+  }
   // keep only the sources the answer actually cites
   const cited = new Set([...text.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
   // the tree is shown as a short card, not the whole text given to the model

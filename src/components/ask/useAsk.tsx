@@ -7,7 +7,7 @@ import { useLang } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
 
 export type Source = { n: number; kind: string; text: string; memoryId?: string; factId?: string; title?: string; author?: string; photo?: string };
-export type Answer = { answer: string; sources: Source[]; known: boolean } | { error: string };
+export type Answer = { answer: string; sources: Source[]; known: boolean; feeling?: boolean } | { error: string };
 
 /** asks the site a question about Rosa; the answer comes only from what the family shared */
 export function useAsk() {
@@ -155,7 +155,7 @@ export function AnswerView({ res, onSource, compact, chat }: { res: Answer; onSo
           className="inline-flex min-h-11 items-center gap-2 self-center text-[0.92rem] text-burgundy underline decoration-dusty/50 underline-offset-4"
         >
           <ImagePlus className="h-4 w-4" strokeWidth={1.6} aria-hidden />
-          {s.tellMore}
+          {res.feeling ? s.feelingInvite : s.tellMore}
         </motion.a>
       )}
     </motion.div>
