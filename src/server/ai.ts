@@ -17,6 +17,8 @@ export const MODELS = {
   vision: "@cf/mistralai/mistral-small-3.1-24b-instruct",
   speech: "@cf/openai/whisper-large-v3-turbo",
   embed: "@cf/baai/bge-m3",
+  /** grandma's answers: a larger model that writes more natural, warmer Hebrew and Russian */
+  voice: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
 } as const;
 
 type Ai = { run(model: string, input: unknown): Promise<unknown> };
@@ -55,7 +57,8 @@ export async function aiAvailable() {
 }
 
 /** how many calls of each kind may run in one day (UTC), so the free allowance is shared sensibly */
-const DAILY: Record<Budget, number> = { background: 120, speech: 25, ask: 150, embed: 600 };
+// questions use the larger model, which takes more of the free allowance per answer: fewer a day
+const DAILY: Record<Budget, number> = { background: 120, speech: 25, ask: 80, embed: 600 };
 export type Budget = "background" | "speech" | "ask" | "embed";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -85,8 +88,11 @@ export async function runAi<T = unknown>(kind: Budget, model: string, input: unk
 }
 
 /** a chat answer as text */
-export async function chat(kind: Budget, messages: { role: "system" | "user" | "assistant"; content: unknown }[], opts: { maxTokens?: number; temperature?: number } = {}) {
-  const res = await runAi<{ response?: unknown }>(kind, MODELS.text, { messages, max_tokens: opts.maxTokens ?? 900, temperature: opts.temperature ?? 0.2 });
+export async function chat(kind: Budget, messages: { role: "system" | "user" | "assistant"; content: unknown }[], opts: { maxTokens?: number; temperature?: number; model?: string } = {}) {
+  const input = { messages, max_tokens: opts.maxTokens ?? 900, temperature: opts.temperature ?? 0.2 };
+  let res = await runAi<{ response?: unknown }>(kind, opts.model ?? MODELS.text, input);
+  // the chosen model is not available (and the day's share is not used up): the usual one answers
+  if (!res && opts.model && opts.model !== MODELS.text && (await budgetLeft(kind)) > 0) res = await runAi<{ response?: unknown }>(kind, MODELS.text, input);
   if (!res) return null;
   return typeof res.response === "string" ? res.response : JSON.stringify(res.response ?? "");
 }
