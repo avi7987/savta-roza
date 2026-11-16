@@ -1,10 +1,13 @@
 "use client";
 
+import { motion } from "motion/react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ImageOff, Mic, Play } from "lucide-react";
 import type { Photo } from "@/content/types";
 import { useLang } from "@/lib/i18n";
 import { isEstimate } from "@/lib/photoDate";
+import { ease } from "@/lib/motion";
+import { canShare } from "../Lightbox";
 import { cn } from "../ui";
 
 /** the white border of a print, on each side, and the room under it for the caption */
@@ -85,7 +88,7 @@ function layout(photos: Photo[], width: number): Row[] {
   return rows;
 }
 
-function Print({ item, height, featured, repeat, onOpen }: { item: Item; height: number; featured: boolean; repeat: boolean; onOpen: () => void }) {
+function Print({ item, height, featured, repeat, place, onOpen }: { item: Item; height: number; featured: boolean; repeat: boolean; place: number; onOpen: () => void }) {
   const { t, l } = useLang();
   const p = item.photo;
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
@@ -98,7 +101,15 @@ function Print({ item, height, featured, repeat, onOpen }: { item: Item; height:
   const tape = featured || item.index % 5 === 2;
 
   return (
-    <li className="relative shrink-0" style={{ width: item.width }}>
+    // laid on the page as it scrolls into view: from a little lower and slightly askew, one after another along the row, once
+    <motion.li
+      className="relative shrink-0"
+      style={{ width: item.width }}
+      initial={{ opacity: 0, y: 18, rotate: item.index % 2 ? 1.4 : -1.4 }}
+      whileInView={{ opacity: 1, y: 0, rotate: 0 }}
+      viewport={{ once: true, amount: 0.25 }}
+      transition={{ duration: 0.9, ease, delay: place * 0.07 }}
+    >
       <button
         type="button"
         onClick={onOpen}
@@ -123,6 +134,7 @@ function Print({ item, height, featured, repeat, onOpen }: { item: Item; height:
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img
+              data-print={canShare(p) ? p.id : undefined}
               src={p.src}
               alt={l(p.alt)}
               loading="lazy"
@@ -143,7 +155,7 @@ function Print({ item, height, featured, repeat, onOpen }: { item: Item; height:
           <span className="text-[0.78rem] tabular-nums text-ink-soft sm:text-[0.82rem]">{date}</span>
         </span>
       </button>
-    </li>
+    </motion.li>
   );
 }
 
@@ -170,8 +182,8 @@ export default function AlbumGrid({ photos, onOpen }: { photos: Photo[]; onOpen:
     <div ref={box} className="w-full">
       {rows.map((r, i) => (
         <ul key={i} className={cn("flex gap-3 sm:gap-[22px]", (r.featured || r.short) && "justify-center", i > 0 && "mt-4 sm:mt-7")}>
-          {r.items.map((it) => (
-            <Print key={it.photo.id} item={it} height={r.height} featured={r.featured} repeat={!r.featured && it.index > 0 && sameStory(photos[it.index - 1], it.photo)} onOpen={() => onOpen(it.photo)} />
+          {r.items.map((it, k) => (
+            <Print key={it.photo.id} item={it} place={k} height={r.height} featured={r.featured} repeat={!r.featured && it.index > 0 && sameStory(photos[it.index - 1], it.photo)} onOpen={() => onOpen(it.photo)} />
           ))}
         </ul>
       ))}

@@ -1,14 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, animate, motion, useDragControls, useMotionValue, type PanInfo } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Pencil, Plus, UserPlus, X } from "lucide-react";
 import { ROSA } from "@/content/family";
 import type { Photo } from "@/content/types";
 import { chainToRosa, photosOf, photosTogether } from "@/lib/family";
 import { useLang } from "@/lib/i18n";
-import { ease } from "@/lib/motion";
 import ArchivalImage from "../ArchivalImage";
 import { useLightbox } from "../Lightbox";
 import Portal from "../Portal";
@@ -68,7 +67,7 @@ function PhotoStrip({ list, title }: { list: Photo[]; title: string }) {
 }
 
 function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: string; onClose: () => void; onSwitch: (id: string) => void; onAdd: (p: AddPreset) => void }) {
-  const { t, lang } = useLang();
+  const { t, lang, dir } = useLang();
   const closeRef = useRef<HTMLButtonElement>(null);
   const p = fam.graph.byId.get(id)!;
   const g = fam.graph;
@@ -98,6 +97,25 @@ function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: str
     };
   }, [onClose]);
 
+  // on a phone the sheet can be pulled down by its handle to close, the way phone sheets work
+  const drag = useDragControls();
+  // the drawer only opens after a tap, so the window is there to ask
+  const [phone, setPhone] = useState(() => window.matchMedia("(max-width: 767px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  // where it comes from and goes back to: the bottom on a phone, the side (the end of the line) on a computer
+  // (in pixels on a phone: after a pull the sheet is already some pixels down)
+  const away = phone ? { x: 0, y: window.innerHeight } : { x: dir === "rtl" ? "-100%" : "100%", y: 0 };
+  const sheetY = useMotionValue(0);
+  const onDragEnd = (_: unknown, info: PanInfo) => {
+    if (info.offset.y > 110 || info.velocity.y > 600) onClose();
+    else animate(sheetY, 0, { type: "spring", visualDuration: 0.35, bounce: 0 });
+  };
+
   const facts = [p.born && [t.family.born, p.born], p.birthplace && [t.family.from, p.birthplace], p.died && [t.family.died, p.died]].filter(Boolean) as [string, string][];
 
   return (
@@ -108,18 +126,27 @@ function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: str
         aria-modal="true"
         aria-label={name}
         data-lenis-prevent
-        initial={{ x: "var(--from-x)", y: "var(--from-y)", opacity: 0.6 }}
+        initial={{ ...away, opacity: 0.6 }}
         animate={{ x: 0, y: 0, opacity: 1 }}
-        exit={{ x: "var(--from-x)", y: "var(--from-y)", opacity: 0 }}
-        transition={{ duration: 0.45, ease }}
-        className="fixed inset-x-0 bottom-0 top-[12svh] z-[85] flex w-full flex-col overflow-y-auto rounded-t-[22px] bg-ivory shadow-[var(--shadow-lift)] [--from-x:0%] [--from-y:100%] md:inset-x-auto md:end-0 md:top-0 md:max-w-[28rem] md:rounded-none md:[--from-x:100%] md:[--from-y:0%] md:rtl:[--from-x:-100%]"
-        style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        exit={{ ...away, opacity: 0, transition: { type: "spring", visualDuration: 0.32, bounce: 0 } }}
+        transition={{ type: "spring", visualDuration: 0.45, bounce: 0 }}
+        drag={phone ? "y" : false}
+        dragControls={drag}
+        dragListener={false}
+        dragConstraints={{ top: 0 }}
+        dragElastic={0}
+        dragMomentum={false}
+        onDragEnd={onDragEnd}
+        className="fixed inset-x-0 bottom-0 top-[12svh] z-[85] flex w-full flex-col overflow-y-auto rounded-t-[22px] bg-ivory shadow-[var(--shadow-lift)] md:inset-x-auto md:end-0 md:top-0 md:max-w-[28rem] md:rounded-none"
+        style={{ y: sheetY, paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
+        <div onPointerDown={(e) => phone && drag.start(e)} className="flex shrink-0 touch-none flex-col md:touch-auto">
         <span aria-hidden className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-line md:hidden" />
         <div className="flex justify-end p-3">
           <button ref={closeRef} type="button" onClick={onClose} aria-label={t.family.close} className="flex h-11 w-11 items-center justify-center rounded-full text-burgundy hover:bg-blush/50">
             <X className="h-5 w-5" strokeWidth={1.4} aria-hidden />
           </button>
+        </div>
         </div>
         <div className="flex flex-col gap-8 px-7 pb-10">
           <header className="flex flex-col items-center gap-3 text-center">

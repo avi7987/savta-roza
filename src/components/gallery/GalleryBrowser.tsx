@@ -85,7 +85,7 @@ function Browser() {
     el?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
   }, [active]);
 
-  const openPhoto = (p: Photo) => open(shown, shown.indexOf(p));
+  const openPhoto = (p: Photo) => open(shown, shown.indexOf(p), { shared: true });
   const tab = (key: string, label: string) => (
     <button
       key={key}
