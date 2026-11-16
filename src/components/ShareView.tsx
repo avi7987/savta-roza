@@ -6,11 +6,12 @@ import { useLang } from "@/lib/i18n";
 import { LeafSprig, RoseBud } from "./Botanical";
 import { LanguageSwitcher } from "./Header";
 import AddMemoryWizard from "./share/AddMemoryWizard";
+import BulkUpload from "./share/BulkUpload";
 import { TLink } from "./Transition";
 import { Container, Item, Reveal } from "./ui";
 
 /** The "Share a memory" page: an open notebook, words on one side, the form on the other. */
-export default function ShareView() {
+export default function ShareView({ bulk = false }: { bulk?: boolean }) {
   const { t, l } = useLang();
   return (
     <div className="min-h-[100svh] bg-ivory">
@@ -42,7 +43,7 @@ export default function ShareView() {
             </Item>
           </Reveal>
           <div className="rounded-[var(--radius-card)] bg-paper p-5 shadow-[var(--shadow-paper)] ring-1 ring-charcoal/[0.04] sm:p-10 lg:col-span-7 lg:col-start-6">
-            <AddMemoryWizard />
+            {bulk ? <BulkUpload /> : <AddMemoryWizard />}
           </div>
         </Container>
       </main>

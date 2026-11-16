@@ -69,7 +69,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  if (rateLimited(req)) return NextResponse.json({ error: "rate" }, { status: 429 });
+  // the bulk upload sends one file per request, hundreds in a row: it has its own, wider limit
+  const bulk = req.headers.get("x-bulk") === "1";
+  if (bulk ? rateLimited(req, 600, 60 * 60 * 1000, "bulk") : rateLimited(req)) return NextResponse.json({ error: "rate" }, { status: 429 });
 
   let form: FormData;
   try {

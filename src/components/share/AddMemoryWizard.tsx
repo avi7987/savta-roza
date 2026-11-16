@@ -9,7 +9,7 @@ import { ease } from "@/lib/motion";
 import { prepare, shrinkImage, shrinkVideo, type Prepared } from "@/lib/mediaPrep";
 import { decadeLabel, formatDate } from "@/lib/photoDate";
 import { RoseTop } from "../Botanical";
-import { STATIC } from "../Transition";
+import { STATIC, TLink } from "../Transition";
 import { buttonClass, cn } from "../ui";
 import PeoplePicker, { refreshNames, usePeople } from "../people/PeoplePicker";
 
@@ -595,6 +595,10 @@ export default function AddMemoryWizard() {
       return (
         <div className="flex flex-col gap-6">
           {heading(w.typeQ, w.typeLead)}
+          <TLink href="/share/bulk" className="-mt-2 inline-flex w-fit items-center gap-2 rounded-full bg-blush/50 px-4 py-2 text-[0.95rem] text-burgundy transition-colors hover:bg-blush">
+            <Images className="h-4 w-4" strokeWidth={1.6} aria-hidden />
+            {t.bulk.cta}
+          </TLink>
           <div role="radiogroup" aria-label={w.typeQ} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {TYPES.map(({ id, Icon }) => (
               <motion.button
