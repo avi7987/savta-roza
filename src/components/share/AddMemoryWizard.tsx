@@ -4,9 +4,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Camera, ChefHat, FileAudio, FileVideo, Images, Lightbulb, Mail, MessageCircleHeart, Mic, PenLine, Square, Upload, Video, X } from "lucide-react";
 import { useLang } from "@/lib/i18n";
-import { ACCEPT, LIMITS, kindOf, maxBytes } from "@/lib/limits";
+import { ACCEPT, LIMITS, PICK_MB, SEND_MB, kindOf } from "@/lib/limits";
 import { ease } from "@/lib/motion";
-import { prepare, type Prepared } from "@/lib/mediaPrep";
+import { prepare, shrinkImage, shrinkVideo, type Prepared } from "@/lib/mediaPrep";
 import { decadeLabel, formatDate } from "@/lib/photoDate";
 import { RoseTop } from "../Botanical";
 import { STATIC } from "../Transition";
@@ -16,7 +16,8 @@ import PeoplePicker, { refreshNames, usePeople } from "../people/PeoplePicker";
 type MType = "photos" | "video" | "audio" | "story" | "letter" | "recipe" | "words" | "info";
 type TextType = "story" | "letter" | "recipe" | "words" | "info";
 type Dup = { match: "exact" | "similar"; status: "approved" | "pending" } | "local";
-type Picked = { file: File; url?: string; kind: "image" | "video" | "audio"; prep?: Prepared; preparing?: boolean; dup?: Dup | null };
+/** small: the copy that is sent (made smaller in the browser); shrinking: how far a video is (0..1) */
+type Picked = { file: File; url?: string; kind: "image" | "video" | "audio"; prep?: Prepared; preparing?: boolean; dup?: Dup | null; small?: File; shrinking?: number };
 type WhenMode = "unknown" | "date" | "year" | "decade";
 type When = { mode: WhenMode; date: string; year: string; decade?: number };
 
@@ -259,7 +260,7 @@ export default function AddMemoryWizard() {
     for (const file of Array.from(list)) {
       const kind = kindOf(file.type);
       if (!kind) problems.push(s.errors.type(file.name));
-      else if (file.size > maxBytes(kind)) problems.push(s.errors.size(file.name));
+      else if (file.size > PICK_MB[kind] * 1024 * 1024) problems.push(s.errors.size(file.name));
       else {
         const url = kind === "image" ? URL.createObjectURL(file) : undefined;
         if (url) urls.current.push(url);
@@ -288,8 +289,11 @@ export default function AddMemoryWizard() {
             }
             setFiles((cur) => {
               const twice = !!prep.sha && cur.some((x) => x.file !== p.file && x.prep?.sha === prep.sha && !blocked(x));
-              return cur.map((x) => (x.file === p.file ? { ...x, prep, preparing: false, dup: twice ? "local" : dup } : x));
+              return cur.map((x) => (x.file === p.file ? { ...x, prep, dup: twice ? "local" : dup } : x));
             });
+            // then a smaller copy to send (photos in a moment, videos can take a minute)
+            const small = p.kind === "image" ? await shrinkImage(p.file) : await shrinkVideo(p.file, (v) => setFiles((cur) => cur.map((x) => (x.file === p.file ? { ...x, shrinking: v } : x))));
+            setFiles((cur) => cur.map((x) => (x.file === p.file ? { ...x, small, shrinking: undefined, preparing: false } : x)));
           })
       );
   };
@@ -340,6 +344,12 @@ export default function AddMemoryWizard() {
       setStep(1);
       return;
     }
+    const total = sendable.reduce((n, f) => n + (f.small ?? f.file).size, 0);
+    if (total > SEND_MB * 1024 * 1024) {
+      setErrors({ content: s.errors.tooMuch });
+      setStep(1);
+      return;
+    }
     try {
       localStorage.setItem(NAME, values.name.trim());
     } catch {}
@@ -372,7 +382,7 @@ export default function AddMemoryWizard() {
     tagged.forEach((id) => fd.append("people", id));
     newNames.forEach((n) => fd.append("newPeople", n));
     sendable.forEach((f, i) => {
-      fd.append("files", f.file);
+      fd.append("files", f.small ?? f.file);
       if (f.prep?.thumb) fd.append(`thumb-${i}`, f.prep.thumb, "thumb.jpg");
       if (f.prep?.sound) fd.append(`sound-${i}`, f.prep.sound, "sound.wav");
     });
@@ -457,7 +467,7 @@ export default function AddMemoryWizard() {
         </div>
         <p className="hidden text-center text-[0.88rem] text-ink-soft sm:block">{w.drop}</p>
         <p id={`${ids.files}-hint`} className="text-center text-[0.82rem] text-ink-soft">
-          {s.filesHint(LIMITS.imageMB, LIMITS.videoMB, LIMITS.audioMB)}
+          {s.filesHint(PICK_MB.image, PICK_MB.video, PICK_MB.audio)}
         </p>
         <input
           ref={pickRef}
@@ -508,7 +518,7 @@ export default function AddMemoryWizard() {
               )}
               {f.kind !== "audio" && !blocked(f) && (
                 <span className="absolute inset-x-1 bottom-1 truncate rounded bg-white/90 px-1.5 py-0.5 text-center text-[0.7rem] text-charcoal">
-                  {f.preparing ? "…" : (f.prep?.date ?? f.prep?.nameDate) ? `${formatDate({ source: "exif", date: (f.prep?.date ?? f.prep?.nameDate)! }, lang)} · ${s.fromFile}` : s.noDate}
+                  {f.shrinking !== undefined ? s.shrinking(Math.round(f.shrinking * 100)) : f.preparing ? "…" : (f.prep?.date ?? f.prep?.nameDate) ? `${formatDate({ source: "exif", date: (f.prep?.date ?? f.prep?.nameDate)! }, lang)} · ${s.fromFile}` : s.noDate}
                 </span>
               )}
               <button

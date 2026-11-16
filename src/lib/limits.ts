@@ -1,8 +1,9 @@
 /** Upload rules shared by the form (for friendly messages) and the server (which enforces them). */
 export const LIMITS = {
   maxFiles: 10,
-  imageMB: 15,
-  videoMB: 200,
+  /** what is stored, after the browser made photos and videos smaller */
+  imageMB: 25,
+  videoMB: 95,
   audioMB: 30,
   name: 80,
   relation: 60,
@@ -22,6 +23,11 @@ export function kindOf(mime: string): MediaKind | null {
   for (const k of Object.keys(ACCEPT) as MediaKind[]) if ((ACCEPT[k] as readonly string[]).includes(mime)) return k;
   return null;
 }
+
+/** what may be picked: bigger, because the browser makes it smaller before sending */
+export const PICK_MB = { image: 60, video: 2000, audio: 30 } as const;
+/** Cloudflare's free plan takes at most 100MB in one request */
+export const SEND_MB = 95;
 
 export function maxBytes(kind: MediaKind) {
   const mb = kind === "image" ? LIMITS.imageMB : kind === "video" ? LIMITS.videoMB : LIMITS.audioMB;

@@ -229,3 +229,75 @@ export async function thumbFromBlob(blob: Blob) {
   c.getContext("2d")!.drawImage(bmp, 0, 0, w, h);
   return { width: bmp.width, height: bmp.height, thumb: await toJpeg(c), phash: dhash(c) };
 }
+
+/* ---------- making files smaller before they are sent (the free storage holds far more) ---------- */
+
+/** the long side of a photo on the site: sharp on any screen, and fine for a normal print */
+const PHOTO_MAX = 2560;
+
+/**
+ * A photo, resized and saved as a good-quality JPEG. Turned the right way up (as the camera meant it).
+ * The original is returned when the browser cannot open it (e.g. HEIC outside Safari) or when the
+ * smaller copy would not be smaller.
+ */
+export async function shrinkImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const k = Math.min(1, PHOTO_MAX / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k);
+    c.height = Math.round(bmp.height * k);
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close?.();
+    const blob = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.86));
+    if (!blob || blob.size >= file.size * 0.9) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg", lastModified: file.lastModified });
+  } catch {
+    return file;
+  }
+}
+
+/** videos are made at most this tall/wide on their shorter side (720p): clear, and about 5 times smaller */
+const VIDEO_SHORT_SIDE = 720;
+
+/**
+ * A video re-made in the browser as a smaller MP4 (H.264 + AAC, 720p). Returns the original when the
+ * browser cannot do it (older devices) or when it would not save space. onProgress gets 0..1.
+ */
+export async function shrinkVideo(file: File, onProgress?: (p: number) => void): Promise<File> {
+  if (!file.type.startsWith("video/") || typeof VideoEncoder === "undefined") return file;
+  try {
+    const mb = await import("mediabunny");
+    if (!(await mb.canEncodeVideo("avc"))) return file;
+    const input = new mb.Input({ source: new mb.BlobSource(file), formats: mb.ALL_FORMATS });
+    const target = new mb.BufferTarget();
+    const output = new mb.Output({ format: new mb.Mp4OutputFormat({ fastStart: "in-memory" }), target });
+    const conversion = await mb.Conversion.init({
+      input,
+      output,
+      video: (track) => {
+        const w = track.displayWidth, h = track.displayHeight;
+        const short = Math.min(w, h);
+        const k = short > VIDEO_SHORT_SIDE ? VIDEO_SHORT_SIDE / short : 1;
+        // even sizes, as video encoders want
+        const even = (x: number) => Math.max(2, Math.round((x * k) / 2) * 2);
+        return { codec: "avc", width: even(w), height: even(h), fit: "fill", quality: mb.QUALITY_MEDIUM };
+      },
+      // the sound is copied as it is when it can be (no re-encoding, no loss); never left out
+      audio: {},
+    });
+    if (!conversion.isValid || conversion.discardedTracks.some((d) => d.track.type === "audio")) return file;
+    conversion.onProgress = (p) => onProgress?.(p);
+    await conversion.execute();
+    const buf = target.buffer;
+    if (!buf || buf.byteLength >= file.size * 0.9) return file;
+    return new File([buf], file.name.replace(/\.[^.]+$/, "") + ".mp4", { type: "video/mp4", lastModified: file.lastModified });
+  } catch (e) {
+    console.warn("[video] kept the original:", e);
+    return file;
+  }
+}
