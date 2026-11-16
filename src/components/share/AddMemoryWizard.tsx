@@ -127,6 +127,12 @@ export default function AddMemoryWizard() {
   const camRef = useRef<HTMLInputElement>(null);
   const headRef = useRef<HTMLHeadingElement>(null);
   const [step, setStep] = useState(0);
+  // which way the steps are moving, so each one slides in from the right side
+  const lastStep = useRef(0);
+  const forward = step >= lastStep.current;
+  useEffect(() => {
+    lastStep.current = step;
+  }, [step]);
   const [type, setType] = useState<MType | null>(null);
   const [values, setValues] = useState({ name: "", relation: "", title: "", memory: "" });
   const [files, setFiles] = useState<Picked[]>([]);
@@ -517,7 +523,7 @@ export default function AddMemoryWizard() {
           {heading(w.typeQ, w.typeLead)}
           <div role="radiogroup" aria-label={w.typeQ} className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {TYPES.map(({ id, Icon }) => (
-              <button
+              <motion.button
                 key={id}
                 type="button"
                 role="radio"
@@ -527,19 +533,22 @@ export default function AddMemoryWizard() {
                   setType(id);
                   setStep(1);
                 }}
+                whileHover={{ y: -3 }}
+                whileTap={{ scale: 0.97 }}
+                transition={{ type: "spring", visualDuration: 0.3, bounce: 0 }}
                 className={cn(
-                  "flex min-h-[8.5rem] flex-col items-start justify-between gap-3 rounded-[var(--radius-card)] border bg-white p-4 text-start transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-burgundy/40 hover:shadow-[var(--shadow-paper)] sm:p-5",
-                  type === id ? "border-burgundy ring-2 ring-burgundy/20" : "border-charcoal/10"
+                  "group flex min-h-[8.5rem] flex-col items-start justify-between gap-3 rounded-[16px] border bg-paper p-4 text-start shadow-[0_1px_2px_rgba(70,35,45,0.07),0_10px_24px_-14px_rgba(70,35,45,0.3)] transition-[border-color,box-shadow] duration-300 hover:border-rose/40 hover:shadow-[0_2px_4px_rgba(70,35,45,0.08),0_16px_30px_-14px_rgba(70,35,45,0.34)] sm:p-5",
+                  type === id ? "border-rose shadow-[0_0_0_3px_var(--color-rose),0_10px_24px_-14px_rgba(70,35,45,0.3)]" : "border-line"
                 )}
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-blush/50 text-burgundy">
+                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-blush/50 text-burgundy transition-[transform,background-color] duration-300 group-hover:scale-110 group-hover:bg-blush">
                   <Icon className="h-5 w-5" strokeWidth={1.6} aria-hidden />
                 </span>
                 <span className="flex flex-col gap-0.5">
                   <span className="text-[1.08rem] font-medium text-charcoal">{w.types[id][0]}</span>
                   <span className="text-[0.85rem] leading-snug text-ink-soft">{w.types[id][1]}</span>
                 </span>
-              </button>
+              </motion.button>
             ))}
           </div>
         </div>
@@ -728,10 +737,22 @@ export default function AddMemoryWizard() {
       <input ref={trap} type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden className="absolute -left-[9999px] h-0 w-0 opacity-0" />
       {/* where you are */}
       <div className="flex flex-col gap-3">
-        <ol className="grid grid-cols-4 gap-1.5" aria-label={w.stepOf(step + 1, STEPS)}>
+        {/* the steps as stations on a line, like a branch of the family tree; the rose line grows as you go */}
+        <ol className="relative grid grid-cols-4" aria-label={w.stepOf(step + 1, STEPS)}>
+          <span aria-hidden className="absolute inset-x-[12.5%] top-[9px] h-0.5 rounded-full bg-[repeating-linear-gradient(90deg,var(--color-rail)_0_3px,transparent_3px_8px)]" />
+          <motion.span
+            aria-hidden
+            className="absolute inset-x-[12.5%] top-[9px] h-0.5 origin-left rounded-full bg-rose rtl:origin-right"
+            initial={false}
+            animate={{ scaleX: step / (STEPS - 1) }}
+            transition={{ type: "spring", visualDuration: 0.5, bounce: 0 }}
+          />
           {w.steps.map((label, i) => (
-            <li key={label} aria-current={i === step ? "step" : undefined} className="flex flex-col gap-1.5">
-              <span className={cn("h-1.5 rounded-full transition-colors duration-500", i <= step ? "bg-rose" : "bg-charcoal/10")} />
+            <li key={label} aria-current={i === step ? "step" : undefined} className="relative flex flex-col items-center gap-2">
+              <span aria-hidden className="relative flex h-5 w-5 items-center justify-center">
+                {i === step && <motion.span layoutId="wizard-step" className="absolute inset-0 rounded-full bg-rose/20" style={{ borderRadius: 999 }} transition={{ type: "spring", visualDuration: 0.45, bounce: 0 }} />}
+                <span className={cn("h-3 w-3 rounded-full border-2 transition-colors duration-500", i < step ? "border-rose bg-rose" : i === step ? "border-rose bg-paper" : "border-charcoal/20 bg-paper")} />
+              </span>
               <span className={cn("hidden text-[0.82rem] sm:block", i === step ? "text-burgundy" : "text-ink-soft")}>{label}</span>
             </li>
           ))}
@@ -751,7 +772,14 @@ export default function AddMemoryWizard() {
       )}
 
       <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={step} initial={{ opacity: 0, x: lang === "he" ? -16 : 16 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35, ease }}>
+        <motion.div
+          key={step}
+          // forward comes from the side the line is read toward; back returns from the other side
+          initial={{ opacity: 0, x: (forward ? 1 : -1) * (lang === "he" ? -28 : 28) }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, transition: { duration: 0.15 } }}
+          transition={{ type: "spring", visualDuration: 0.4, bounce: 0 }}
+        >
           {stepBody()}
         </motion.div>
       </AnimatePresence>

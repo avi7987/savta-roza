@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, ImagePlus } from "lucide-react";
 import type { Photo } from "@/content/types";
@@ -10,7 +11,7 @@ import { LanguageSwitcher } from "../Header";
 import { LightboxProvider, useLightbox } from "../Lightbox";
 import { TLink } from "../Transition";
 import SearchButton from "../Search";
-import { Container, cn } from "../ui";
+import { Container, DecadeMark, Segmented, cn, paper } from "../ui";
 import AlbumGrid from "./AlbumGrid";
 import { usePhotos } from "./usePhotos";
 
@@ -93,12 +94,11 @@ function Browser() {
       data-key={key}
       aria-current={active === key ? "true" : undefined}
       onClick={() => scrollTo(key)}
-      className={cn(
-        "min-h-11 shrink-0 whitespace-nowrap rounded-t-[8px] border border-b-0 px-4 font-display text-[1rem] transition-colors",
-        active === key ? "border-line bg-paper text-burgundy" : "border-transparent text-ink-soft hover:text-burgundy"
-      )}
+      className={cn("relative min-h-10 shrink-0 whitespace-nowrap rounded-full px-4 font-display text-[1rem] transition-colors duration-300", active === key ? "text-burgundy" : "text-ink-soft hover:text-burgundy")}
     >
-      {label}
+      {/* the decade being looked at: a soft mark that glides along as the album scrolls */}
+      {active === key && <motion.span layoutId="album-tab" aria-hidden className="absolute inset-0 rounded-full bg-blush/70" style={{ borderRadius: 999 }} transition={{ type: "spring", visualDuration: 0.4, bounce: 0 }} />}
+      <span className="relative">{label}</span>
     </button>
   );
 
@@ -117,7 +117,7 @@ function Browser() {
         </Container>
         {groups.length > 1 && (
           <Container wide>
-            <nav aria-label={t.album.decades} className="border-b border-line">
+            <nav aria-label={t.album.decades} className="border-b border-line pb-2.5">
               <div ref={tabs} className="-mx-[var(--spacing-gutter)] flex gap-1 overflow-x-auto px-[var(--spacing-gutter)] [scrollbar-width:none] sm:mx-0 sm:justify-center sm:px-0">
                 {tab("top", t.album.top)}
                 {groups.map((g) => tab(g.key, g.label))}
@@ -134,16 +134,7 @@ function Browser() {
             <h1 className="font-display text-[clamp(2.1rem,5vw,3.6rem)] font-light leading-tight text-burgundy">{t.album.coverTitle}</h1>
             <p className="font-hand text-[1.05rem] leading-relaxed text-ink-soft sm:text-[1.15rem]">{t.album.coverLead}</p>
             {counts.all > 0 && KINDS.filter((k) => k !== "all" && counts[k] > 0).length > 1 && (
-              <div role="group" aria-label={t.album.type} className="mt-2 flex flex-wrap justify-center gap-x-1 text-[0.95rem]">
-                {KINDS.filter((k) => k === "all" || counts[k] > 0).map((k, i) => (
-                  <span key={k} className="flex items-center">
-                    {i > 0 && <span aria-hidden className="px-1 text-dusty">·</span>}
-                    <button type="button" aria-pressed={kind === k} onClick={() => setKind(k)} className={cn("min-h-11 px-2", kind === k ? "text-burgundy underline decoration-dusty underline-offset-[6px]" : "text-ink-soft hover:text-burgundy")}>
-                      {t.album.kinds[k]}
-                    </button>
-                  </span>
-                ))}
-              </div>
+              <Segmented className="mt-3" label={t.album.type} value={kind} onChange={setKind} options={KINDS.filter((k) => k === "all" || counts[k] > 0).map((k) => ({ id: k, label: t.album.kinds[k] }))} />
             )}
           </div>
 
@@ -162,12 +153,9 @@ function Browser() {
                 key={g.key}
                 id={sectionId(g.key)}
                 aria-label={g.label}
-                className="scroll-mt-32 rounded-[4px] border border-line/80 bg-paper px-3 pb-8 pt-6 shadow-[0_1px_2px_rgba(60,40,30,0.05),0_12px_32px_-12px_rgba(60,40,30,0.12)] sm:scroll-mt-36 sm:px-10 sm:pb-12 sm:pt-9"
+                className={cn(paper, "scroll-mt-32 px-3 pb-8 pt-6 sm:scroll-mt-36 sm:px-10 sm:pb-12 sm:pt-9")}
               >
-                <div className="mb-6 flex items-baseline justify-between gap-3 px-1 sm:mb-8">
-                  <h2 className="font-hand text-[1.7rem] leading-tight text-burgundy sm:text-[2.1rem]">{g.label}</h2>
-                  <span className="text-[0.85rem] tabular-nums text-ink-soft">{t.gallery.items(g.list.length)}</span>
-                </div>
+                <DecadeMark className="mb-6 px-1 sm:mb-9" year={g.key === "undated" ? undefined : g.key} title={g.label} count={t.gallery.items(g.list.length)} />
                 {g.key === "undated" && <p className="-mt-3 mb-6 max-w-xl px-1 text-ink-soft">{t.gallery.undatedLead}</p>}
                 <AlbumGrid photos={g.list} onOpen={openPhoto} />
               </section>

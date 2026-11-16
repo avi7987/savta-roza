@@ -11,7 +11,7 @@ import ArchivalImage from "../ArchivalImage";
 import AudioPlayer from "../AudioPlayer";
 import { RemovalRequest } from "../PhotoActions";
 import { STATIC, TLink } from "../Transition";
-import { Container, SectionIntro, buttonClass, cn } from "../ui";
+import { Container, Pill, SectionIntro, buttonClass, cn } from "../ui";
 
 const dateFmt = (iso: string, lang: string) => {
   try {
@@ -60,15 +60,18 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
       onPointerLeave={rest}
       style={{ rotateX, rotateY, transformPerspective: 1100 } as MotionStyle}
       className={cn(
-        "group relative mb-8 flex scroll-mt-28 break-inside-avoid flex-col rounded-[var(--radius-card)] p-6 shadow-[var(--shadow-paper)] ring-1 ring-charcoal/[0.04] transition-shadow duration-500 hover:shadow-[var(--shadow-lift)] sm:p-8",
+        "group relative mb-8 flex scroll-mt-28 break-inside-avoid flex-col rounded-[18px] border border-line p-6 shadow-[0_1px_2px_rgba(70,35,45,0.07),0_10px_24px_-14px_rgba(70,35,45,0.3)] transition-shadow duration-500 hover:shadow-[0_2px_4px_rgba(70,35,45,0.08),0_18px_36px_-16px_rgba(70,35,45,0.36)] sm:p-7",
         tone
       )}
     >
       <motion.span aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit]" style={{ boxShadow: shadow }} />
       {m.placeholder && <span className="mb-3 text-[0.72rem] tracking-wide text-rose">{t.memories.example}</span>}
 
+      {/* words alone open with a quiet quotation mark */}
+      {!withPhoto && !m.mediaKind && <span aria-hidden className="-mb-3 -mt-1 font-display text-[3.4rem] leading-none text-blush">&rdquo;</span>}
+
       {withPhoto && (
-        <div className="-mx-2 -mt-2 mb-6 sm:-mx-3 sm:-mt-3">
+        <div className="-mx-2 -mt-2 mb-6 overflow-hidden rounded-[12px] sm:-mx-3 sm:-mt-3">
           {photo ? (
             <ArchivalImage photo={photo} reveal={false} labelled={false} />
           ) : (
@@ -97,10 +100,9 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
 
       <footer className="mt-6 flex flex-wrap items-end justify-between gap-3 border-t border-line pt-4">
         <span className="flex flex-col">
-          <span className="font-hand text-xl leading-tight text-rose">{m.author}</span>
-          <span className="text-[0.82rem] text-ink-soft">
-            {m.relation}
-            {m.relation && " · "}
+          <span className="font-hand text-xl leading-tight text-[#a24a64]">{m.author}</span>
+          <span className="mt-1 flex flex-wrap items-center gap-2 text-[0.8rem] text-ink-soft">
+            {m.relation && <Pill>{m.relation}</Pill>}
             <time dateTime={m.createdAt}>{dateFmt(m.createdAt, lang)}</time>
           </span>
         </span>

@@ -54,7 +54,7 @@ export default function PhoneTabs() {
               ) : (
                 <Icon className="relative h-[1.35rem] w-[1.35rem]" strokeWidth={on ? 1.9 : 1.5} aria-hidden />
               )}
-              <span className={cn("relative", add && "text-rose")}>{label}</span>
+              <span className={cn("relative", add && "text-burgundy")}>{label}</span>
             </TLink>
           </li>
         ))}

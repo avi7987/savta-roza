@@ -10,7 +10,7 @@ import { decadeLabel, decadeOf, isEstimate } from "@/lib/photoDate";
 import { useLightbox } from "../Lightbox";
 import { STATIC, TLink } from "../Transition";
 import { usePhotos } from "../gallery/usePhotos";
-import { Container, SectionIntro, buttonClass, cn } from "../ui";
+import { Container, DecadeMark, Pill, SectionIntro, buttonClass, cn, paper } from "../ui";
 
 type Notes = Record<string, { title?: string; text?: string; titleRu?: string; textRu?: string }>;
 type Fact = { id: string; statement: string; statementRu?: string; year?: number; place?: string; sources: string[] };
@@ -30,7 +30,7 @@ const shuffle = <T,>(a: T[]) => {
 /** a fixed-shape tile; the full, uncropped photo opens in the viewer */
 function Tile({ photo, onOpen, label, className }: { photo: Photo; onOpen: () => void; label: string; className?: string }) {
   return (
-    <button type="button" onClick={onOpen} aria-label={label} className={cn("group relative block h-full w-full cursor-zoom-in overflow-hidden rounded-[var(--radius-photo)] bg-mount", className)}>
+    <button type="button" onClick={onOpen} aria-label={label} className={cn("group relative block h-full w-full cursor-zoom-in overflow-hidden rounded-[10px] bg-mount", className)}>
       <AnimatePresence initial={false}>
         <motion.img
           key={photo.id}
@@ -106,8 +106,7 @@ function Decade({ decade, photos, note, facts, index }: { decade: number; photos
       className="grid scroll-mt-28 gap-8 lg:grid-cols-12 lg:gap-14"
     >
       <div className={cn("flex flex-col gap-4 lg:col-span-4 lg:pt-6", flip && "lg:order-2")}>
-        <span className="font-display text-[clamp(3rem,7vw,5.5rem)] leading-none tabular-nums text-dusty/70">{decade}</span>
-        <h3 className="font-display text-[1.9rem] font-normal leading-tight text-burgundy">{note?.title || label}</h3>
+        <DecadeMark as="h3" year={decade} title={note?.title || label} />
         {note?.text && <p className="whitespace-pre-line text-[1.05rem] leading-[1.85] text-charcoal/85">{note.text}</p>}
         {photos.length > 0 && (
           <TLink href={`/gallery#d-${decade}`} className="w-fit text-[0.95rem] text-burgundy underline decoration-dusty/50 underline-offset-4">
@@ -115,8 +114,10 @@ function Decade({ decade, photos, note, facts, index }: { decade: number; photos
           </TLink>
         )}
         {facts.length > 0 && (
-          <section aria-label={`${t.story.known} · ${label}`} className="mt-2 flex flex-col gap-2 border-s-2 border-sage/50 ps-4">
-            <h4 className="label !text-sage-deep">{t.story.known}</h4>
+          <section aria-label={`${t.story.known} · ${label}`} className="mt-2 flex flex-col gap-2.5 rounded-[14px] bg-white/70 p-4 ring-1 ring-blush">
+            <h4>
+              <Pill>{t.story.known}</Pill>
+            </h4>
             <ul className="flex flex-col gap-1.5">
               {facts.map((f) => (
                 <li key={f.id} className="text-[0.98rem] leading-relaxed text-charcoal/90">
@@ -149,7 +150,9 @@ function Decade({ decade, photos, note, facts, index }: { decade: number; photos
           {shown.map((p, i) => (
             <div
               key={i}
+              // each photo a print on the page: a white border and a soft shadow, as in the album
               className={cn(
+                "rounded-[14px] bg-white p-1.5 shadow-[0_1px_2px_rgba(70,35,45,0.08),0_10px_24px_-14px_rgba(70,35,45,0.3)]",
                 shown.length === 1 && "aspect-[4/3]",
                 shown.length === 2 && "aspect-[4/5]",
                 shown.length >= 3 && (i === 0 ? "col-span-2 aspect-[4/3] sm:row-span-2 sm:aspect-auto" : "aspect-square")
@@ -169,8 +172,8 @@ function Undated({ photos }: { photos: Photo[] }) {
   const { open } = useLightbox();
   const list = photos.slice(0, 12);
   return (
-    <div className="rounded-[var(--radius-card)] border border-dashed border-dusty/50 bg-white/50 p-6 sm:p-10">
-      <h3 className="font-display text-[1.7rem] text-burgundy">{t.story.undatedTitle}</h3>
+    <div className={cn(paper, "p-6 sm:p-10")}>
+      <DecadeMark as="h3" title={t.story.undatedTitle} count={photos.length} />
       <p className="mt-2 max-w-2xl text-ink-soft">{t.story.undatedLead}</p>
       <div className="mt-6 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
         {list.map((p, i) => (
@@ -245,7 +248,7 @@ export default function LifeStory() {
         {decades.length > 1 && (
           <nav aria-label={t.gallery.jump} className="mt-10 flex flex-wrap gap-2">
             {decades.map(([d]) => (
-              <a key={d} href={`#story-${d}`} className="min-h-10 rounded-full border border-charcoal/15 bg-white px-4 py-2 text-[0.9rem] text-charcoal transition-colors hover:border-burgundy hover:text-burgundy">
+              <a key={d} href={`#story-${d}`} className="inline-flex min-h-10 items-center rounded-full bg-white/70 px-4 font-display text-[1rem] text-charcoal ring-1 ring-line transition-[background-color,color,box-shadow] duration-300 hover:bg-blush/60 hover:text-burgundy hover:ring-blush">
                 {decadeLabel(d, lang)}
               </a>
             ))}

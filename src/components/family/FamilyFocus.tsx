@@ -73,7 +73,7 @@ export default function FamilyFocus({ fam, onOpen, onAdd }: { fam: Fam; onOpen: 
   const section = (title: string, children: ReactNode, extra?: ReactNode) => (
     <section className="flex flex-col gap-2.5">
       <div className="flex items-center justify-between">
-        <h4 className="label">{title}</h4>
+        <h3 className="label">{title}</h3>
         {extra}
       </div>
       {children}
@@ -131,7 +131,7 @@ export default function FamilyFocus({ fam, onOpen, onAdd }: { fam: Fam; onOpen: 
 
           {focus === ROSA && kids.length > 0 && (
             <section className="flex flex-col gap-2.5">
-              <h4 className="label">{m.branches}</h4>
+              <h3 className="label">{m.branches}</h3>
               <ul className="flex flex-col gap-2.5">
                 {kids.map((k) => {
                   const desc = descendants(k);
