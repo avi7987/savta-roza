@@ -18,6 +18,8 @@ export default function AskRosa() {
   const s = t.search;
   const { ask, busy, res, reset } = useAsk();
   const [q, setQ] = useState("");
+  // the question as it was asked, shown above her answer like a conversation
+  const [asked, setAsked] = useState("");
   const [hint, setHint] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const Send = lang === "he" ? ArrowLeft : ArrowRight;
@@ -32,18 +34,28 @@ export default function AskRosa() {
   if (STATIC) return null;
 
   const go = (text: string) => {
+    if (text.trim().length < 3) return;
     setQ(text);
+    setAsked(text.trim());
     ask(text);
   };
+  const face = (size: string) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/images/rosa-avatar.webp" alt="" className={`${size} shrink-0 rounded-full bg-blush object-cover ring-4 ring-white shadow-[0_8px_24px_-10px_rgba(118,46,73,0.45)]`} />
+  );
 
   return (
     <section id="ask" aria-labelledby="ask-title" className="relative overflow-hidden py-[clamp(4rem,8vw,7rem)]">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(48rem_22rem_at_50%_0%,rgba(232,212,211,0.6),transparent_70%),radial-gradient(30rem_18rem_at_50%_100%,rgba(167,181,160,0.14),transparent_70%)]" />
       <Container className="relative flex flex-col items-center gap-6 text-center">
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ type: "spring", visualDuration: 0.6, bounce: 0.25 }}>
+          {face("h-24 w-24 sm:h-28 sm:w-28")}
+        </motion.div>
         <motion.span initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7, ease }} className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-1.5 text-[0.85rem] text-burgundy ring-1 ring-blush">
           <Sparkles className="h-4 w-4 text-rose" strokeWidth={1.6} aria-hidden />
           {s.askEyebrow}
         </motion.span>
+        <p className="-mb-3 font-hand text-[clamp(1.25rem,2.4vw,1.6rem)] text-burgundy/90">{s.askHello}</p>
         <motion.h2 id="ask-title" initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, ease, delay: 0.05 }} className="max-w-3xl text-[clamp(2.1rem,4.6vw,3.6rem)] font-light leading-[1.1] text-burgundy">
           {s.askTitle}
         </motion.h2>
@@ -52,7 +64,7 @@ export default function AskRosa() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            ask(q);
+            go(q);
           }}
           className="group mt-2 flex w-full max-w-2xl items-center gap-2 rounded-full bg-white p-2 ps-5 shadow-[0_2px_4px_rgba(60,40,30,0.06),0_18px_44px_-18px_rgba(118,46,73,0.35)] ring-1 ring-blush transition-shadow focus-within:shadow-[0_2px_4px_rgba(60,40,30,0.06),0_22px_50px_-16px_rgba(118,46,73,0.45)] focus-within:ring-rose/50"
         >
@@ -89,10 +101,23 @@ export default function AskRosa() {
           ))}
         </div>
 
-        <div aria-live="polite" className="w-full max-w-3xl">
+        <div aria-live="polite" className="flex w-full max-w-3xl flex-col gap-4">
+          {(busy || res) && asked && (
+            <motion.p
+              dir="auto"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 max-w-[85%] self-end rounded-[20px] rounded-ee-[6px] bg-burgundy px-5 py-3 text-start text-[1.05rem] text-white shadow-[0_8px_20px_-12px_rgba(90,30,50,0.6)]"
+            >
+              {asked}
+            </motion.p>
+          )}
           {busy && (
-            <div className="mt-4 flex justify-center">
-              <Thinking label={s.thinking} />
+            <div className="flex items-end gap-3 self-start">
+              {face("h-11 w-11")}
+              <div className="rounded-[20px] rounded-es-[6px] bg-white/85 px-5 py-4 ring-1 ring-blush">
+                <Thinking label={s.thinking} />
+              </div>
             </div>
           )}
           {res && (
@@ -100,20 +125,28 @@ export default function AskRosa() {
               initial={{ opacity: 0, y: 12, scale: 0.985 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", visualDuration: 0.5, bounce: 0 }}
-              className="mt-6 flex flex-col items-center gap-5 rounded-[24px] bg-white/60 p-6 ring-1 ring-white sm:p-8"
+              className="flex w-full items-end gap-3 self-start"
             >
-              <AnswerView res={res} />
-              <button
+              {face("hidden h-11 w-11 sm:block")}
+              <div className="flex min-w-0 flex-1 flex-col items-stretch gap-5 rounded-[24px] rounded-es-[6px] bg-white/80 p-5 text-start ring-1 ring-blush shadow-[0_14px_36px_-22px_rgba(118,46,73,0.45)] sm:p-7">
+                <span className="flex items-center gap-2 text-[0.85rem] text-burgundy">
+                  {face("h-7 w-7 ring-2 sm:hidden")}
+                  {s.rosa}
+                </span>
+                <AnswerView res={res} chat />
+                <button
                 type="button"
                 onClick={() => {
                   reset();
                   setQ("");
+                  setAsked("");
                   input.current?.focus();
                 }}
-                className="text-[0.92rem] text-burgundy underline decoration-dusty/50 underline-offset-4"
+                className="self-center text-[0.92rem] text-ink-soft underline decoration-dusty/50 underline-offset-4 hover:text-burgundy"
               >
                 {s.another}
               </button>
+              </div>
             </motion.div>
           )}
         </div>

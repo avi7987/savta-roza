@@ -87,6 +87,8 @@ ${context}`,
   // the tree is shown as a short card, not the whole text given to the model
   const card = (s: (typeof sourcesAll)[number]) => (s.kind === "tree" ? { ...s, text: lang === "ru" ? "Семейное древо на сайте" : "עץ המשפחה באתר" } : s);
   const used = sourcesAll.filter((s) => cited.has(s.n)).map(card);
-  const known = used.length > 0 && !text.includes(unknown);
+  // "nobody told me that yet", even in other words, is not an answer: the family is invited to tell it
+  const notTold = text.includes(unknown) || /לא סיפרו לי|עוד לא יודעת|לא ידוע לי|не рассказал|пока не знаю|мне неизвестно/i.test(text);
+  const known = used.length > 0 && !notTold;
   return json({ answer: known ? text : unknown, sources: known ? used : [], known });
 }

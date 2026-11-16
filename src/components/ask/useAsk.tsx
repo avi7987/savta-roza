@@ -42,7 +42,7 @@ export function Thinking({ label }: { label: string }) {
 }
 
 /** the answer, its [n] marks linked to the source cards beneath it */
-export function AnswerView({ res, onSource, compact }: { res: Answer; onSource?: () => void; compact?: boolean }) {
+export function AnswerView({ res, onSource, compact, chat }: { res: Answer; onSource?: () => void; compact?: boolean; chat?: boolean }) {
   const { t } = useLang();
   const s = t.search;
   if ("error" in res) return <p className="text-center text-burgundy">{res.error === "tired" ? s.tired : s.askFailed}</p>;
@@ -67,7 +67,7 @@ export function AnswerView({ res, onSource, compact }: { res: Answer; onSource?:
   const pieces = paras.length > 1 ? paras : res.answer.match(/[^.!?]+[.!?]+(?:\s*\[\d+\](?:,?\s*\[\d+\])*)?\s*|[^.!?]+$/g) ?? [res.answer];
   const STEP = 0.22;
   const sourcesAt = 0.25 + pieces.length * STEP;
-  const textClass = compact ? "font-display text-[1.25rem] leading-relaxed text-charcoal" : "text-center font-display text-[clamp(1.3rem,2.4vw,1.75rem)] leading-relaxed text-charcoal";
+  const textClass = compact ? "font-display text-[1.25rem] leading-relaxed text-charcoal" : chat ? "text-start font-display text-[clamp(1.2rem,2.2vw,1.55rem)] leading-relaxed text-charcoal" : "text-center font-display text-[clamp(1.3rem,2.4vw,1.75rem)] leading-relaxed text-charcoal";
 
   return (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease }} className="flex flex-col gap-5">
@@ -144,6 +144,19 @@ export function AnswerView({ res, onSource, compact }: { res: Answer; onSource?:
             })}
           </ul>
         </div>
+      )}
+      {res.known && !compact && (
+        <motion.a
+          href="/share"
+          onClick={onSource}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: sourcesAt + 0.3 + res.sources.length * 0.08 }}
+          className="inline-flex min-h-11 items-center gap-2 self-center text-[0.92rem] text-burgundy underline decoration-dusty/50 underline-offset-4"
+        >
+          <ImagePlus className="h-4 w-4" strokeWidth={1.6} aria-hidden />
+          {s.tellMore}
+        </motion.a>
       )}
     </motion.div>
   );
