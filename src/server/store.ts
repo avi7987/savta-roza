@@ -177,7 +177,8 @@ export const familyStore: Store<StoredPerson> = lazy<StoredPerson>("family");
 /** text read out of a file: a letter's words (ocr) or what is said in a recording (transcript) */
 export type StoredText = Base & { memoryId: string; file?: string; source: "ocr" | "transcript"; text: string; model?: string };
 
-export type FactSource = { memoryId: string; file?: string; kind: "memory" | "note" | "ocr" | "transcript" | "owner"; quote?: string };
+/** "family": a family member told it directly ("tell me"), quote = the question it answers, by = their name */
+export type FactSource = { memoryId: string; file?: string; kind: "memory" | "note" | "ocr" | "transcript" | "owner" | "family"; quote?: string; by?: string };
 /**
  * One thing known about Rosa's life. status: pending = a suggestion (found by the computer or a
  * visitor, not checked), approved = verified by the site's owner, rejected = wrong.
@@ -190,7 +191,7 @@ export type StoredFact = Base & {
   place?: string;
   people?: string[];
   sources: FactSource[];
-  by: "ai" | "owner";
+  by: "ai" | "owner" | "family";
 };
 
 /** a piece of the archive in "meaning space" (an embedding), so search can find it by sense, not only by words */

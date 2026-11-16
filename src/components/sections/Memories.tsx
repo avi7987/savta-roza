@@ -83,13 +83,24 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
 
       {m.title && <h3 className="mb-3 font-display text-[1.6rem] font-normal leading-snug text-burgundy">{m.title}</h3>}
 
-      <p lang={foreign && !original ? lang : m.lang} className={cn("text-[1.05rem] leading-[1.85] text-charcoal/90", !withPhoto && !m.title && "font-display text-[1.35rem] leading-[1.6] text-charcoal")}>
+      {body?.trim() && <p lang={foreign && !original ? lang : m.lang} className={cn("text-[1.05rem] leading-[1.85] text-charcoal/90", !withPhoto && !m.title && "font-display text-[1.35rem] leading-[1.6] text-charcoal")}>
         {body}
-      </p>
+      </p>}
 
       {m.mediaKind === "audio" && m.mediaSrc && <AudioPlayer src={m.mediaSrc} title={m.title || m.author} className="mt-5" />}
       {m.mediaKind === "video" && m.mediaSrc && (
         <video src={m.mediaSrc} controls playsInline preload="metadata" className="mt-5 w-full rounded-[var(--radius-photo)] bg-black" />
+      )}
+      {m.transcript && (
+        <details className="group/t mt-4 rounded-[12px] bg-blush/25 px-4 py-3">
+          <summary className="flex min-h-9 cursor-pointer list-none items-center gap-2 text-[0.92rem] text-burgundy">
+            <Mic className="h-4 w-4" strokeWidth={1.5} aria-hidden />
+            {t.memories.transcript}
+            <span aria-hidden className="ms-auto transition-transform group-open/t:rotate-180">⌄</span>
+          </summary>
+          <p dir="auto" className="mt-2 whitespace-pre-line text-[0.98rem] leading-relaxed text-charcoal/85">{m.transcript}</p>
+          <p className="mt-2 text-[0.78rem] text-ink-soft">{t.memories.transcriptNote}</p>
+        </details>
       )}
       {m.mediaKind && !m.mediaSrc && (
         <span className="mt-4 inline-flex items-center gap-2 text-[0.85rem] text-sage-deep">
@@ -125,8 +136,8 @@ export default function Memories() {
     if (STATIC) return;
     fetch("/api/memories")
       .then((r) => (r.ok ? r.json() : { memories: [] }))
-      // photos alone already live in the life story; here go words and recordings
-      .then((d: { memories: Memory[] }) => setList((d.memories ?? []).filter((m) => m.body?.trim() || m.mediaKind === "audio")))
+      // everything shared with words, a recording or a video; photos alone (no words) live in the album
+      .then((d: { memories: Memory[] }) => setList((d.memories ?? []).filter((m) => m.body?.trim() || m.title?.trim() || m.mediaKind)))
       .catch(() => setList([]));
   }, []);
 

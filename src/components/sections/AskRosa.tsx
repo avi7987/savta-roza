@@ -13,6 +13,65 @@ import { Container } from "../ui";
  * "What would you like to know about grandma?" on the home page: one inviting question box,
  * a few questions to start from, and the answer right here, with where it comes from.
  */
+const NAME_KEY = "roza-my-name";
+
+/** a family member tells grandma one short detail; it waits for the owner's check before answers use it */
+function QuickTell({ question, onClose }: { question?: string; onClose?: () => void }) {
+  const { t } = useLang();
+  const s = t.search;
+  const [answer, setAnswer] = useState("");
+  const [by, setBy] = useState(() => {
+    try {
+      return localStorage.getItem(NAME_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [state, setState] = useState<"idle" | "sending" | "done" | "failed" | "missing">("idle");
+  const send = async () => {
+    if (answer.trim().length < 3 || by.trim().length < 2) return setState("missing");
+    setState("sending");
+    try {
+      localStorage.setItem(NAME_KEY, by.trim());
+    } catch {}
+    const r = await fetch("/api/facts/suggest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ answer, by, question }) }).catch(() => null);
+    setState(r?.ok ? "done" : "failed");
+  };
+  if (state === "done") return <p role="status" className="rounded-[16px] bg-white/80 px-5 py-4 text-start text-burgundy ring-1 ring-blush">{s.tellThanks}</p>;
+  const field = "w-full rounded-[14px] border border-charcoal/15 bg-white px-4 py-3 text-[1rem] text-charcoal outline-none focus:border-rose focus:shadow-[0_0_0_3px_rgba(184,92,120,0.15)]";
+  return (
+    <motion.form
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        send();
+      }}
+      className="flex w-full flex-col gap-3 rounded-[20px] bg-white/80 p-5 text-start ring-1 ring-blush"
+    >
+      <div>
+        <h3 className="font-display text-[1.3rem] text-burgundy">{s.tellTitle}</h3>
+        <p className="mt-1 text-[0.9rem] text-ink-soft">{s.tellLead}</p>
+      </div>
+      <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} maxLength={300} rows={2} dir="auto" aria-label={s.tellTitle} placeholder={s.tellPh} className={field} />
+      <input value={by} onChange={(e) => setBy(e.target.value)} maxLength={80} autoComplete="name" aria-label={s.tellName} placeholder={s.tellName} className={field} />
+      {state === "missing" && <p role="alert" className="text-[0.9rem] text-burgundy">{s.tellMissing}</p>}
+      {state === "failed" && <p role="alert" className="text-[0.9rem] text-burgundy">{s.tellFailed}</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="submit" disabled={state === "sending"} className="min-h-11 rounded-full bg-burgundy px-6 text-white disabled:opacity-60">
+          {state === "sending" ? s.tellSending : s.tellSend}
+        </button>
+        {onClose && (
+          <button type="button" onClick={onClose} className="min-h-11 px-3 text-ink-soft hover:text-charcoal">
+            {t.removal.cancel}
+          </button>
+        )}
+      </div>
+    </motion.form>
+  );
+}
+
 export default function AskRosa() {
   const { t, lang } = useLang();
   const s = t.search;
@@ -20,6 +79,7 @@ export default function AskRosa() {
   const [q, setQ] = useState("");
   // the question as it was asked, shown above her answer like a conversation
   const [asked, setAsked] = useState("");
+  const [telling, setTelling] = useState(false);
   const [hint, setHint] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const Send = lang === "he" ? ArrowLeft : ArrowRight;
@@ -134,6 +194,7 @@ export default function AskRosa() {
                   {s.rosa}
                 </span>
                 <AnswerView res={res} chat />
+                {"known" in res && !res.known && <QuickTell key={asked} question={asked} />}
                 <button
                 type="button"
                 onClick={() => {
@@ -150,6 +211,17 @@ export default function AskRosa() {
             </motion.div>
           )}
         </div>
+        {telling ? (
+          <div className="w-full max-w-3xl">
+            <QuickTell onClose={() => setTelling(false)} />
+          </div>
+        ) : (
+          !(res && "known" in res && !res.known) && (
+            <button type="button" onClick={() => setTelling(true)} className="min-h-11 text-[0.95rem] text-burgundy underline decoration-dusty/50 underline-offset-4">
+              {s.tellOpen}
+            </button>
+          )
+        )}
         <p className="text-[0.78rem] text-ink-soft/80">{s.askHint}</p>
       </Container>
     </section>

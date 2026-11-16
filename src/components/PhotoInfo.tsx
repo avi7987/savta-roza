@@ -166,6 +166,14 @@ export default function PhotoInfo({ photo, onChange, onJump }: { photo: Photo; o
         </blockquote>
       )}
 
+      {photo.transcript && (
+        <section className="flex flex-col gap-2">
+          <h3 className="label">{t.memories.transcript}</h3>
+          <p dir="auto" className="whitespace-pre-line rounded-xl bg-white/70 p-4 leading-relaxed ring-1 ring-charcoal/5">{photo.transcript}</p>
+          <p className="text-[0.78rem] text-ink-soft">{t.memories.transcriptNote}</p>
+        </section>
+      )}
+
       {people.length > 0 && (
         <section className="flex flex-col gap-2">
           <h3 className="label">{t.info.inPhoto}</h3>

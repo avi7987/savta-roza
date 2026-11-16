@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { sortYear } from "@/lib/photoDate";
 import { analyzeMemory, later } from "@/server/analyze";
-import { store } from "@/server/store";
+import { store, textStore } from "@/server/store";
 
 export const runtime = "nodejs";
 
@@ -10,6 +10,7 @@ const DAY = 24 * 60 * 60 * 1000;
 /** Every photo and video on the site, newest first by when it was taken, for the story, gallery and family cards. */
 export async function GET() {
   const memories = (await store.list()).filter((m) => m.status !== "rejected");
+  const texts = (await textStore.list("approved")).filter((t) => t.source === "transcript");
   const photos = memories.flatMap((m) =>
     m.files
       .map((f) => {
@@ -21,6 +22,7 @@ export async function GET() {
           full: url(f.name),
           poster: f.kind === "video" && f.thumb ? url(f.thumb) : undefined,
           story: m.body?.trim() || undefined,
+          transcript: f.kind !== "image" ? texts.find((t) => t.memoryId === m.id && t.file === f.name)?.text : undefined,
           lang: m.lang,
           ratio: f.width && f.height ? f.width / f.height : 4 / 3,
           date: f.date,

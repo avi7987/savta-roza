@@ -1,5 +1,6 @@
 import "server-only";
 import { MODELS, aiAvailable, runAi } from "./ai";
+import { peopleDirectory } from "./people";
 import { factStore, store, textStore, vectorStore, type StoredFact, type StoredVector } from "./store";
 
 /*
@@ -71,7 +72,10 @@ export async function indexMemory(memoryId: string): Promise<boolean> {
     return true;
   }
   const pieces: Piece[] = [];
-  const head = [m.title, m.body].filter(Boolean).join(". ");
+  // the people tagged in it are part of what it says ("who was there?")
+  const { nameOf } = await peopleDirectory();
+  const tagged = Array.from(new Set([...(m.people ?? []), ...m.files.flatMap((f) => f.people ?? [])])).map(nameOf).filter(Boolean);
+  const head = [m.title, m.body, tagged.length ? `People in this memory: ${tagged.join(", ")}` : ""].filter(Boolean).join(". ");
   for (const c of chunks(head)) pieces.push({ kind: "memory", memoryId, text: c });
   for (const f of m.files)
     for (const n of f.notes ?? []) {

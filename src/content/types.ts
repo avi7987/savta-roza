@@ -37,6 +37,8 @@ export type Photo = {
   /** the words shared together with this photo */
   story?: string;
   storyLang?: Lang;
+  /** what is said in a video or recording, written down by the computer */
+  transcript?: string;
   /** what family members told about it ("tell us more") */
   notes?: { at: string; by?: string; people?: string[]; who?: string; when?: string; place?: string; what?: string }[];
   when?: PhotoDate;
@@ -109,6 +111,8 @@ export type Memory = {
   photoSrc?: string;
   mediaKind?: "video" | "audio";
   mediaSrc?: string;
+  /** what is said in the recording or video, written down by the computer (may contain errors) */
+  transcript?: string;
   removalRequested?: boolean;
   createdAt: string;
   placeholder?: boolean;

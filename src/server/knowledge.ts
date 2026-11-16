@@ -59,7 +59,19 @@ const ORDER: Record<StoredJob["type"], number> = { ocr: 0, transcribe: 0, facts:
  * Do some of the waiting work. Stops when the day's share of the AI allowance is used; what is
  * left stays in the queue for the next time (a later upload, or the owner opening the page).
  */
+/**
+ * When what goes into the search changes (e.g. the people tagged in a memory were added to it),
+ * every memory is indexed again, once.
+ */
+const INDEX_VERSION = "2";
+async function refreshIndexOnce() {
+  if ((await store.getMeta("index-version").catch(() => undefined)) === INDEX_VERSION) return;
+  await store.setMeta("index-version", INDEX_VERSION);
+  for (const m of await store.list()) if (m.status !== "rejected") await enqueue("index", m.id);
+}
+
 export async function runJobs(opts: { memoryId?: string; limit?: number } = {}) {
+  await refreshIndexOnce().catch(() => {});
   const jobs = (await jobStore.list("pending"))
     .filter((j) => !opts.memoryId || j.memoryId === opts.memoryId)
     .sort((a, b) => ORDER[a.type] - ORDER[b.type] || a.createdAt.localeCompare(b.createdAt));

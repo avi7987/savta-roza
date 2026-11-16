@@ -14,7 +14,7 @@ type Data = {
 };
 
 export const CATEGORY_HE: Record<StoredFact["category"], string> = { origin: "שורשים", family: "משפחה", home: "בית", work: "עבודה", events: "אירועים", traits: "אופי", food: "אוכל", other: "אחר" };
-const KIND_HE = { memory: "מתוך הזיכרון", note: "ממה שהמשפחה סיפרה על תמונה", ocr: "מתוך מכתב או מסמך", transcript: "מתוך הקלטה", owner: "נכתב על ידי מנהל האתר" } as const;
+const KIND_HE = { memory: "מתוך הזיכרון", note: "ממה שהמשפחה סיפרה על תמונה", ocr: "מתוך מכתב או מסמך", transcript: "מתוך הקלטה", owner: "נכתב על ידי מנהל האתר", family: "סופר ישירות באתר" } as const;
 const TABS = [
   ["pending", "הצעות לבדיקה"],
   ["approved", "מאומת"],
@@ -222,7 +222,7 @@ export default function KnowledgeManager({ token, onDone }: { token: string; onD
                   <span className="rounded-full bg-blush/50 px-2 py-0.5 text-burgundy">{CATEGORY_HE[f.category]}</span>
                   {f.year && <span className="rounded-full bg-ivory px-2 py-0.5 tabular-nums">{f.year}</span>}
                   {f.place && <span className="rounded-full bg-ivory px-2 py-0.5">{f.place}</span>}
-                  <span className="rounded-full bg-ivory px-2 py-0.5 text-ink-soft">{f.by === "ai" ? "נמצא על ידי המחשב" : "נכתב ידנית"}</span>
+                  <span className="rounded-full bg-ivory px-2 py-0.5 text-ink-soft">{f.by === "ai" ? "נמצא על ידי המחשב" : f.by === "family" ? "נשלח על ידי בן משפחה" : "נכתב ידנית"}</span>
                 </p>
               </div>
               <div className="flex flex-wrap gap-1">
@@ -252,6 +252,14 @@ export default function KnowledgeManager({ token, onDone }: { token: string; onD
                   .filter((s) => s.kind !== "owner")
                   .map((s, i) => (
                     <li key={i} className="flex flex-col gap-0.5">
+                      {s.kind === "family" ? (
+                        <span className="text-ink-soft">
+                          {KIND_HE.family}
+                          {s.by ? ` · ${s.by}` : ""}
+                          {s.quote ? ` · בתשובה לשאלה: "${s.quote}"` : ""}
+                        </span>
+                      ) : (
+                      <>
                       {s.quote && <q className="text-charcoal/90">{s.quote}</q>}
                       <span className="text-ink-soft">
                         {KIND_HE[s.kind]} ·{" "}
@@ -260,6 +268,8 @@ export default function KnowledgeManager({ token, onDone }: { token: string; onD
                         </a>
                         {data.titles[s.memoryId]?.author ? ` · ${data.titles[s.memoryId].author}` : ""}
                       </span>
+                      </>
+                      )}
                     </li>
                   ))}
               </ul>

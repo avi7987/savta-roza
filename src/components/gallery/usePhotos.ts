@@ -9,6 +9,7 @@ type ApiPhoto = {
   id: string;
   kind: "image" | "video" | "audio";
   story?: string;
+  transcript?: string;
   lang?: "he" | "ru";
   notes?: Photo["notes"];
   src: string;
@@ -55,6 +56,7 @@ function load(): Promise<Photo[]> {
         ratio: p.ratio > 0.2 && p.ratio < 5 ? p.ratio : 4 / 3,
         alt: p.kind === "video" ? VIDEO_ALT : p.kind === "audio" ? AUDIO_ALT : ALT,
         story: p.story,
+        transcript: p.transcript,
         storyLang: p.lang,
         notes: p.notes,
         caption: p.caption ? { he: p.caption, ru: p.caption } : undefined,

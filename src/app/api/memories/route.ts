@@ -3,7 +3,7 @@ import { LIMITS, detectLang, kindOf, maxBytes } from "@/lib/limits";
 import { rateLimited } from "@/server/auth";
 import { sniff } from "@/server/sniff";
 import { resolvePeople } from "@/server/people";
-import { MEMORY_TYPES, store, type MemoryType, type StoredMemory } from "@/server/store";
+import { MEMORY_TYPES, store, textStore, type MemoryType, type StoredMemory, type StoredText } from "@/server/store";
 import { afterStore, canStore } from "@/server/quota";
 import { analyzeMemory, later } from "@/server/analyze";
 import { enqueueMemory, runJobs } from "@/server/knowledge";
@@ -38,7 +38,7 @@ function yearInText(text: string) {
 }
 
 /** Public shape of a memory: no moderation data, files via the guarded file route. */
-const publicShape = (m: StoredMemory) => {
+const publicShape = (m: StoredMemory, texts: StoredText[] = []) => {
   const image = m.files.find((f) => f.kind === "image");
   const media = m.files.find((f) => f.kind !== "image");
   const url = (n: string) => `/api/files/memories/${m.id}/${n}`;
@@ -56,6 +56,7 @@ const publicShape = (m: StoredMemory) => {
     people: m.people,
     mediaKind: media?.kind,
     mediaSrc: media ? url(media.name) : undefined,
+    transcript: media ? texts.find((t) => t.memoryId === m.id && t.file === media.name && t.source === "transcript")?.text : undefined,
     removalRequested: !!m.deleteRequest,
   };
 };
@@ -63,7 +64,8 @@ const publicShape = (m: StoredMemory) => {
 export async function GET() {
   // everything shared is public right away, until the owner removes it
   const visible = (await store.list()).filter((m) => m.status !== "rejected");
-  return NextResponse.json({ memories: visible.map(publicShape) }, { headers: { "Cache-Control": "no-cache" } });
+  const texts = (await textStore.list("approved")).filter((t) => t.source === "transcript");
+  return NextResponse.json({ memories: visible.map((m) => publicShape(m, texts)) }, { headers: { "Cache-Control": "no-cache" } });
 }
 
 export async function POST(req: Request) {
