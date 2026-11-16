@@ -75,6 +75,56 @@ function FactForm({ fact, onSave, onCancel, busy }: { fact?: StoredFact; onSave:
  * the words it came from; only what the owner verifies is used to write the life story and to
  * answer the family's questions.
  */
+/** how Rosa talked: words, pet names and sayings the answers in her voice may use */
+function VoiceEditor({ token, onDone }: { token: string; onDone: (msg: string) => void }) {
+  const [text, setText] = useState("");
+  const [saved, setSaved] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    fetch("/api/admin/voice", { headers: { "x-admin-token": token } })
+      .then((r) => (r.ok ? r.json() : { voice: "" }))
+      .then((d: { voice?: string }) => {
+        setText(d.voice ?? "");
+        setSaved(d.voice ?? "");
+      })
+      .catch(() => {});
+  }, [token]);
+  const save = async () => {
+    setBusy(true);
+    const r = await fetch("/api/admin/voice", { method: "POST", headers: { "x-admin-token": token, "Content-Type": "application/json" }, body: JSON.stringify({ voice: text }) }).catch(() => null);
+    setBusy(false);
+    if (!r?.ok) return onDone("השמירה לא הצליחה, נסו שוב");
+    const d = (await r.json()) as { voice: string };
+    setText(d.voice);
+    setSaved(d.voice);
+    onDone("נשמר. התשובות של סבתא ישתמשו בזה מעכשיו");
+  };
+  return (
+    <section className="flex flex-col gap-3 rounded-lg bg-white p-5 shadow-[var(--shadow-paper)]">
+      <h3 className="font-display text-[1.35rem] text-burgundy">איך סבתא דיברה</h3>
+      <p className="max-w-3xl text-[0.95rem] text-ink-soft">
+        בחלק &quot;מה היית רוצה לשאול אותי?&quot; סבתא עונה בגוף ראשון. כתבו כאן מילים, כינויי חיבה וביטויים שהיו שלה, כל אחד בשורה, ואפשר להוסיף הסבר קצר. התשובות ישתמשו בהם מדי פעם, כשזה
+        מתאים. העובדות עצמן ימשיכו להגיע רק ממה שהמשפחה שיתפה.
+      </p>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={6}
+        maxLength={2000}
+        dir="auto"
+        placeholder={"למשל:\nמותק שלי (כך פנתה לנכדים)\nקושאי, קושאי! (תאכלו!)\nהכול יהיה בסדר, העיקר בריאות"}
+        className="w-full rounded-md border border-charcoal/20 bg-white px-3 py-2 leading-relaxed"
+      />
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={save} disabled={busy || text === saved} className="min-h-11 rounded-full bg-burgundy px-5 text-white disabled:opacity-40">
+          {busy ? "שומר…" : "שמירה"}
+        </button>
+        <span className="text-[0.85rem] text-ink-soft">{text.length}/2000</span>
+      </div>
+    </section>
+  );
+}
+
 export default function KnowledgeManager({ token, onDone }: { token: string; onDone: (msg: string) => void }) {
   const [data, setData] = useState<Data | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number][0]>("pending");
@@ -115,6 +165,8 @@ export default function KnowledgeManager({ token, onDone }: { token: string; onD
         מכל מה שהמשפחה משתפת, המחשב קורא מכתבים ומתכונים מצולמים, כותב את מה שנאמר בהקלטות, ומחפש עובדות על החיים של רוזה. כל עובדה מגיעה עם המילים המדויקות שמהן נלקחה, והיא נשארת
         &quot;הצעה&quot; עד שאתם מאשרים אותה. רק עובדות מאומתות משמשות לכתיבת סיפור החיים ולתשובות על שאלות.
       </p>
+
+      <VoiceEditor token={token} onDone={onDone} />
 
       <section className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg bg-white p-5 shadow-[var(--shadow-paper)]">
         <span className="flex items-center gap-2">

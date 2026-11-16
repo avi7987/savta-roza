@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { useState } from "react";
-import { BookOpen, FileText, Mic, Network, Quote, ShieldCheck } from "lucide-react";
+import { BookOpen, FileText, ImagePlus, Mic, Network, Quote, ShieldCheck } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { ease } from "@/lib/motion";
 
@@ -87,6 +87,16 @@ export function AnswerView({ res, onSource, compact }: { res: Answer; onSource?:
             </motion.span>
           ))}
         </p>
+      )}
+      {/* nobody has told the site this yet: an invitation to tell it */}
+      {!res.known && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease, delay: sourcesAt }} className={compact ? "flex flex-col items-start gap-3" : "flex flex-col items-center gap-3"}>
+          <p className="text-ink-soft">{s.unknownInvite}</p>
+          <a href="/share" onClick={onSource} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-burgundy px-5 text-[0.95rem] text-white transition-transform hover:-translate-y-0.5">
+            <ImagePlus className="h-4 w-4" strokeWidth={1.6} aria-hidden />
+            {s.addMemory}
+          </a>
+        </motion.div>
       )}
       {res.sources.length > 0 && (
         <div className="flex flex-col gap-2">

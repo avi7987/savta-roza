@@ -4,6 +4,7 @@ import { rateLimited } from "@/server/auth";
 import { budgetLeft, chat } from "@/server/ai";
 import { familySummary } from "@/server/familyFacts";
 import { nearest } from "@/server/semantic";
+import { getVoice } from "@/server/voice";
 import { factStore, store } from "@/server/store";
 
 export const runtime = "nodejs";
@@ -55,20 +56,23 @@ export async function POST(req: Request) {
     ? [...sources, { n: sources.length + 1, kind: "tree" as const, text: tree, memoryId: undefined, factId: undefined, title: undefined, author: undefined, photo: undefined }]
     : sources;
 
-  const unknown = lang === "ru" ? "На сайте пока нет ответа на этот вопрос." : "באתר עוד אין תשובה לשאלה הזו.";
+  // in her voice: what nobody has told the site yet, she has not "been told"
+  const unknown = lang === "ru" ? "Этого мне пока никто не рассказал." : "את זה עוד לא סיפרו לי.";
   if (!sourcesAll.length) return json({ answer: unknown, sources: [], known: false });
 
   const label = { tree: "the family tree", fact: "verified fact", memory: "a family memory", note: "what the family told about a photo", ocr: "text read from a letter (may contain reading errors)", transcript: "transcript of a recording (may contain errors)" };
   const context = sourcesAll.map((s) => `[${s.n}] (${label[s.kind]}${s.author ? `, by ${s.author}` : ""}) ${s.text}`).join("\n");
+  const voice = await getVoice();
   const answer = await chat(
     "ask",
     [
       {
         role: "system",
-        content: `You answer family members' questions about their grandmother Rosa${profile.birthYear ? ` (born ${profile.birthYear})` : ""} on her memorial website.
-Use ONLY the numbered sources below. Do not use any other knowledge and do not guess. If the sources do not answer the question, reply exactly: ${unknown}
-Answer in ${lang === "ru" ? "Russian" : "Hebrew"} only (translate what the sources say if they are in another language), warmly and briefly (1–4 sentences), in your own words: do not paste the sources. Refer to her as "סבתא רוזה" / "бабушка Роза". After each statement put the number of the source it comes from, like [2]. Verified facts are more reliable than memories; letters and transcripts may contain errors. For questions about who is in the family or how many there are, use the family tree source and say it is according to the family tree on the site.
-
+        content: `On the memorial website of grandmother Rosa${profile.birthYear ? ` (born ${profile.birthYear})` : ""}, family members ask her questions, and you answer AS ROSA, in the first person ("I was born…", "my grandchildren…"), speaking to the family member who asked.
+Use ONLY the numbered sources below for every fact. Do not use any other knowledge, do not guess, and do not invent feelings, events, names, places or details that the sources do not give. If the sources do not answer the question, reply exactly: ${unknown}
+Answer in ${lang === "ru" ? "Russian" : "Hebrew"} only (translate what the sources say if they are in another language), warmly and simply, like a grandmother telling, briefly (1–4 sentences), in your own words: do not paste the sources. Use feminine first-person forms for yourself. Do not assume the gender of the person asking: ${lang === "ru" ? "address them politely and neutrally" : "address them in plural (אתם) or in a neutral way"}.
+After each statement put the number of the source it comes from, like [2]. Verified facts are more reliable than memories; letters and transcripts may contain errors. For who is in the family or how many there are, use the family tree source ("in the family tree…" is not needed; just say it as Rosa would).
+${voice ? `How Rosa talked, as the family remembers it (words, pet names, sayings). You may use one of these now and then, only where it fits naturally; never more than one per answer, and never as a fact:\n${voice}\n` : ""}
 Sources:
 ${context}`,
       },
