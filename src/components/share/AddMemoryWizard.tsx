@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Camera, ChefHat, FileAudio, FileVideo, Images, Mail, Mic, PenLine, Square, Upload, Video, X } from "lucide-react";
 import { useLang } from "@/lib/i18n";
 import { ACCEPT, LIMITS, kindOf, maxBytes } from "@/lib/limits";
@@ -42,6 +42,52 @@ const input =
   "w-full rounded-[var(--radius-card)] border border-charcoal/15 bg-white px-4 py-3.5 text-[1.05rem] text-charcoal outline-none transition-[border-color,box-shadow] placeholder:text-charcoal/35 focus:border-rose focus:shadow-[0_0_0_3px_rgba(184,92,120,0.15)] aria-[invalid=true]:border-burgundy";
 const bigBtn =
   "inline-flex min-h-14 items-center justify-center gap-2.5 rounded-[var(--radius-card)] border border-burgundy/20 bg-white px-5 text-[1.02rem] text-burgundy shadow-[0_1px_2px_rgba(60,40,30,0.06)] transition-colors hover:border-burgundy/50 hover:bg-blush/20";
+
+/**
+ * An exact date as three plain fields: day, month by name, year. (The browser's own date box
+ * mixes up its parts on a right-to-left page.) Reports a full YYYY-MM-DD, or "" until it is whole.
+ */
+function DateFields({ value, onChange, lang, labels }: { value: string; onChange: (v: string) => void; lang: string; labels: { day: string; month: string; year: string; bad: string } }) {
+  const [y0, m0, d0] = value ? value.split("-") : ["", "", ""];
+  const [day, setDay] = useState(d0 ? String(Number(d0)) : "");
+  const [month, setMonth] = useState(m0 ? String(Number(m0)) : "");
+  const [year, setYear] = useState(y0 ?? "");
+  const months = useMemo(() => Array.from({ length: 12 }, (_, i) => new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "he-IL", { month: "long" }).format(new Date(2000, i, 1))), [lang]);
+  const d = Number(day), m = Number(month), yr = Number(year);
+  const whole = d >= 1 && m >= 1 && yr >= 1880 && yr <= new Date().getFullYear();
+  // 31 February and the like
+  const real = whole && new Date(yr, m - 1, d).getDate() === d && d <= 31;
+  useEffect(() => {
+    onChange(real ? `${yr}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}` : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [real, yr, m, d]);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="grid max-w-md grid-cols-[4.75rem_minmax(0,1fr)_6rem] gap-2">
+        <label className="flex min-w-0 flex-col gap-1 text-[0.88rem] text-ink-soft">
+          {labels.day}
+          <input type="text" inputMode="numeric" value={day} onChange={(e) => setDay(e.target.value.replace(/\D/g, "").slice(0, 2))} placeholder="15" className={cn(input, "px-2 text-center")} />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-[0.88rem] text-ink-soft">
+          {labels.month}
+          <select value={month} onChange={(e) => setMonth(e.target.value)} className={cn(input, "px-3")}>
+            <option value="">—</option>
+            {months.map((name, i) => (
+              <option key={i} value={i + 1}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex min-w-0 flex-col gap-1 text-[0.88rem] text-ink-soft">
+          {labels.year}
+          <input type="text" inputMode="numeric" value={year} onChange={(e) => setYear(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1968" className={cn(input, "px-2 text-center")} />
+        </label>
+      </div>
+      {whole && !real && <p role="alert" className="text-[0.9rem] text-burgundy">{labels.bad}</p>}
+    </div>
+  );
+}
 
 function Label({ htmlFor, children }: { htmlFor: string; children: ReactNode }) {
   return (
@@ -599,7 +645,7 @@ export default function AddMemoryWizard() {
               </div>
               {when.mode === "unknown" && <p className="text-[0.88rem] leading-relaxed text-ink-soft">{s.whenUnknownHint}</p>}
               {when.mode === "date" && (
-                <input type="date" aria-label={s.whenModes.date} value={when.date} min="1880-01-01" max={new Date().toISOString().slice(0, 10)} onChange={(e) => setWhen((x) => ({ ...x, date: e.target.value }))} className={cn(input, "max-w-xs")} />
+                <DateFields value={when.date} lang={lang} onChange={(v) => setWhen((x) => (x.date === v ? x : { ...x, date: v }))} labels={{ day: s.day, month: s.month, year: s.yearShort, bad: s.badDate }} />
               )}
               {when.mode === "year" && (
                 <input type="number" inputMode="numeric" aria-label={s.whenModes.year} placeholder={s.yearPh} min={1880} max={new Date().getFullYear()} value={when.year} onChange={(e) => setWhen((x) => ({ ...x, year: e.target.value }))} className={cn(input, "max-w-[12rem]")} />
