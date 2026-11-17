@@ -45,10 +45,11 @@ export function LanguageSwitcher({ className, large }: { className?: string; lar
   );
 }
 
-// a few places only: her story, the album, the family, her questions, and adding a memory (the button)
+// a few places only: her story, the album, the memories, the family, her questions, and adding a memory (the button)
 const LINKS = [
   { id: "story", key: "story", href: "/#story" },
   { id: "gallery", key: "gallery", href: "/gallery" },
+  { id: "memories", key: "memories", href: "/memories" },
   { id: "family", key: "family", href: "/family" },
   { id: "questions", key: "questions", href: "/questions" },
 ] as const;
@@ -96,7 +97,7 @@ export default function Header() {
   }, [open]);
 
   const pathname = usePathname();
-  const navActive = (id: string) => (id === "family" && pathname.startsWith("/family")) || (id === "questions" && pathname.startsWith("/questions")) || active === id || (id === "story" && active === "timeline") || (id === "gallery" && active === "media") || (id === "memories" && (active === "letters" || active === "contribute"));
+  const navActive = (id: string) => (id === "family" && pathname.startsWith("/family")) || (id === "questions" && pathname.startsWith("/questions")) || (id === "memories" && pathname.startsWith("/memories")) || active === id || (id === "story" && active === "timeline") || (id === "gallery" && active === "media") || (id === "memories" && (active === "letters" || active === "contribute"));
 
   return (
     <>

@@ -2,7 +2,7 @@
 
 import { motion, useMotionValue, useReducedMotion, useSpring, useTransform, type MotionStyle } from "motion/react";
 import { useEffect, useState, type PointerEvent } from "react";
-import { Mic, Video } from "lucide-react";
+import { ChefHat, Mail, Mic, Video } from "lucide-react";
 import { photoById } from "@/content";
 import type { Memory } from "@/content/types";
 import { useLang } from "@/lib/i18n";
@@ -12,6 +12,8 @@ import AudioPlayer from "../AudioPlayer";
 import { RemovalRequest } from "../PhotoActions";
 import { STATIC, TLink } from "../Transition";
 import { Container, Pill, SectionIntro, buttonClass, cn } from "../ui";
+import { isMemory } from "@/lib/memoryKinds";
+import MemoryWall from "../memories/MemoryWall";
 
 const dateFmt = (iso: string, lang: string) => {
   try {
@@ -21,14 +23,15 @@ const dateFmt = (iso: string, lang: string) => {
   }
 };
 
-export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
+export function MemoryCard({ m, index = 0, className }: { m: Memory; index?: number; className?: string }) {
   const { t, lang } = useLang();
   const foreign = m.lang !== lang && !!m.translation;
   const [original, setOriginal] = useState(false);
   const body = foreign && !original ? m.translation! : m.body;
   const photo = m.photoId ? photoById(m.photoId) : undefined;
   const withPhoto = !!(photo || m.photoSrc);
-  const tone = index % 3 === 1 ? "bg-[#fbf3f1]" : "bg-white";
+  // a recipe on a lined index card; the rest alternate between two soft papers
+  const tone = m.type === "recipe" ? "bg-[#fdf7ec] bg-[repeating-linear-gradient(to_bottom,transparent_0_31px,rgba(168,116,130,0.12)_31px_32px)]" : index % 3 === 1 ? "bg-[#fbf3f1]" : "bg-white";
 
   // with a mouse, the card leans a little toward it, like a photo held in the hand, and its shadow moves the other way
   const reduce = useReducedMotion();
@@ -61,7 +64,8 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
       style={{ rotateX, rotateY, transformPerspective: 1100 } as MotionStyle}
       className={cn(
         "group relative mb-8 flex scroll-mt-28 break-inside-avoid flex-col rounded-[18px] border border-line p-6 shadow-[0_1px_2px_rgba(70,35,45,0.07),0_10px_24px_-14px_rgba(70,35,45,0.3)] transition-shadow duration-500 hover:shadow-[0_2px_4px_rgba(70,35,45,0.08),0_18px_36px_-16px_rgba(70,35,45,0.36)] sm:p-7",
-        tone
+        tone,
+        className
       )}
     >
       <motion.span aria-hidden className="pointer-events-none absolute inset-0 -z-10 rounded-[inherit]" style={{ boxShadow: shadow }} />
@@ -92,6 +96,12 @@ export function MemoryCard({ m, index = 0 }: { m: Memory; index?: number }) {
         </div>
       )}
 
+      {(m.type === "recipe" || m.type === "letter") && (
+        <span className="mb-2 inline-flex w-fit items-center gap-1.5 text-[0.8rem] text-rose">
+          {m.type === "recipe" ? <ChefHat className="h-4 w-4" strokeWidth={1.5} aria-hidden /> : <Mail className="h-4 w-4" strokeWidth={1.5} aria-hidden />}
+          {m.type === "recipe" ? t.memories.recipe : t.memories.letter}
+        </span>
+      )}
       {m.title && <h3 className="mb-3 font-display text-[1.6rem] font-normal leading-snug text-burgundy">{m.title}</h3>}
 
       {body?.trim() && <p lang={foreign && !original ? lang : m.lang} className={cn("text-[1.05rem] leading-[1.85] text-charcoal/90", !withPhoto && !m.title && "font-display text-[1.35rem] leading-[1.6] text-charcoal")}>
@@ -150,7 +160,7 @@ export default function Memories() {
     fetch("/api/memories")
       .then((r) => (r.ok ? r.json() : { memories: [] }))
       // everything shared with words, a recording or a video; photos alone (no words) live in the album
-      .then((d: { memories: Memory[] }) => setList((d.memories ?? []).filter((m) => m.body?.trim() || m.title?.trim() || m.mediaKind)))
+      .then((d: { memories: Memory[] }) => setList((d.memories ?? []).filter(isMemory)))
       .catch(() => setList([]));
   }, []);
 
@@ -160,11 +170,18 @@ export default function Memories() {
       <Container>
         <SectionIntro id="memories-title" eyebrow={t.memories.eyebrow} title={t.memories.title} lead={t.memories.lead} layout="center" />
         {list && list.length > 0 ? (
-          <div className="mt-16 columns-1 gap-8 md:columns-2 lg:columns-3">
-            {list.map((m, i) => (
-              <MemoryCard key={m.id} m={m} index={i} />
-            ))}
-          </div>
+          list.length >= 4 ? (
+            // a wall of notes that change by themselves, so the page stays short however many there are
+            <div className="mt-16">
+              <MemoryWall list={list} />
+            </div>
+          ) : (
+            <div className="mt-16 columns-1 gap-8 md:columns-2 lg:columns-3">
+              {list.map((m, i) => (
+                <MemoryCard key={m.id} m={m} index={i} />
+              ))}
+            </div>
+          )
         ) : list ? (
           <div className="mx-auto mt-14 max-w-xl rounded-[var(--radius-card)] border border-dashed border-dusty/50 bg-white/60 p-8 text-center">
             <p className="font-display text-2xl text-burgundy">{t.memories.empty}</p>
@@ -173,8 +190,13 @@ export default function Memories() {
         ) : (
           <div className="mt-16 h-40" aria-hidden />
         )}
-        <div className="mt-8 flex justify-center">
-          <TLink href="/share" className={buttonClass.secondary}>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
+          {list && list.length > 0 && (
+            <TLink href="/memories" className={buttonClass.secondary}>
+              {t.memories.all(list.length)}
+            </TLink>
+          )}
+          <TLink href="/share" className={buttonClass.quiet}>
             {t.memories.cta}
           </TLink>
         </div>

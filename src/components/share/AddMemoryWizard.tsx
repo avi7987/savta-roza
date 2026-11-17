@@ -203,10 +203,12 @@ export default function AddMemoryWizard() {
   // arrive with ?type=photos, or pick up a draft left earlier in this browser
   useEffect(() => {
     let name = "";
+    // a link that says what to add ("add a recipe") wins over an old draft
+    const asked = new URLSearchParams(window.location.search).get("type");
     try {
       name = localStorage.getItem(NAME) ?? "";
       const d = JSON.parse(localStorage.getItem(DRAFT) ?? "null");
-      if (d && Date.now() - d.at < 14 * 864e5 && (d.type || d.values?.memory || d.values?.title)) {
+      if (!asked && d && Date.now() - d.at < 14 * 864e5 && (d.type || d.values?.memory || d.values?.title)) {
         setType(d.type ?? null);
         setValues({ ...d.values, name: d.values?.name || name });
         if (d.when) setWhen(d.when);

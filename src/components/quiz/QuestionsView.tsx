@@ -133,7 +133,7 @@ export default function QuestionsView() {
           </p>
         ) : (
           <>
-            <div className="sticky top-[4.5rem] z-10 -mx-[var(--spacing-gutter)] mt-10 overflow-x-auto bg-[linear-gradient(to_bottom,var(--color-ivory)_75%,transparent)] px-[var(--spacing-gutter)] pb-5 pt-3 [scrollbar-width:none]">
+            <div className="sticky top-[4.5rem] z-10 mx-[calc(50%-50vw)] mt-10 overflow-x-auto bg-ivory/85 px-[max(var(--spacing-gutter),calc(50vw-50%))] pb-5 pt-3 backdrop-blur-md [mask-image:linear-gradient(to_bottom,black_70%,transparent)] [scrollbar-width:none]">
               <Segmented
                 label={p.filter}
                 value={kind}
