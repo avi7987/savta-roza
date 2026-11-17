@@ -13,7 +13,7 @@ export default function Tools({ token }: { token: string }) {
       <BackupPanel token={token} />
       <AzkaraPanel />
       <Card icon={<BookOpen className="h-5 w-5" strokeWidth={1.6} aria-hidden />} title="ספר הזיכרונות להדפסה" lead="ספר מעוצב מכל מה שנאסף: סיפור החיים לפי עשורים, המילים שלה, מתכונים, סיפורים ותמונות. בוחרים מה ייכנס, רואים איך זה ייראה, ושומרים כ־PDF.">
-        <a href="/admin/book" target="_blank" rel="noopener" className="inline-flex min-h-12 items-center gap-2 rounded-full bg-rose px-7 text-white hover:bg-burgundy">
+        <a href="/admin/book" className="inline-flex min-h-12 items-center gap-2 rounded-full bg-rose px-7 text-white hover:bg-burgundy">
           <BookOpen className="h-4 w-4" aria-hidden />
           לפתוח את הספר
         </a>

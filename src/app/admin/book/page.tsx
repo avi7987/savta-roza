@@ -42,16 +42,24 @@ export default function BookPage() {
   const [loaded, setLoaded] = useState(false);
   const site = typeof window === "undefined" ? "" : location.origin.replace("//redesign-", "//");
 
-  // the owner only: signed in on the admin page in this browser
+  const [pw, setPw] = useState("");
+  const [wrong, setWrong] = useState(false);
+  // the owner only: signed in on the admin page in this tab, or here with the same password
+  const check = async (tk: string) => {
+    const r = await fetch("/api/admin/storage", { headers: { "x-admin-token": tk } }).catch(() => null);
+    if (r?.ok)
+      try {
+        sessionStorage.setItem("roza-admin", tk);
+      } catch {}
+    return !!r?.ok;
+  };
   useEffect(() => {
     let tk = "";
     try {
       tk = sessionStorage.getItem("roza-admin") ?? "";
     } catch {}
     if (!tk) return setOk(false);
-    fetch("/api/admin/storage", { headers: { "x-admin-token": tk } })
-      .then((r) => setOk(r.ok))
-      .catch(() => setOk(false));
+    check(tk).then(setOk);
   }, []);
 
   useEffect(() => {
@@ -90,11 +98,29 @@ export default function BookPage() {
   if (ok === null) return <main className="p-10 text-ink-soft">טוען…</main>;
   if (!ok)
     return (
-      <main className="mx-auto max-w-md p-10 text-center">
-        <p className="text-lg">הדף הזה פתוח רק למנהלי האתר.</p>
-        <a href="/admin" className="mt-4 inline-block text-burgundy underline">
-          לכניסה לדף הניהול
-        </a>
+      <main className="mx-auto max-w-sm p-10">
+        <form
+          className="flex flex-col gap-3 rounded-lg bg-white p-6 shadow-[var(--shadow-paper)]"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const good = await check(pw.trim());
+            setWrong(!good);
+            if (good) setOk(true);
+          }}
+        >
+          <h1 className="font-display text-2xl text-burgundy">ספר הזיכרונות</h1>
+          <label htmlFor="bk" className="text-ink-soft">
+            סיסמת ניהול
+          </label>
+          <input id="bk" type="password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} dir="ltr" value={pw} onChange={(e) => setPw(e.target.value)} className="rounded-md border border-charcoal/20 bg-white px-4 py-3" />
+          <button type="submit" disabled={!pw} className="min-h-12 rounded-full bg-rose text-white hover:bg-burgundy disabled:opacity-50">
+            כניסה
+          </button>
+          {wrong && <p role="alert" className="text-burgundy">הסיסמה לא נכונה.</p>}
+          <a href="/admin" className="text-center text-[0.92rem] text-ink-soft underline">
+            חזרה לדף הניהול
+          </a>
+        </form>
       </main>
     );
 
