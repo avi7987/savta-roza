@@ -1,6 +1,6 @@
 import "server-only";
 import { emailOwner, setting } from "./notify";
-import { store, storageUsed } from "./store";
+import { familyStore, store, storageUsed } from "./store";
 
 const GB = 1024 ** 3;
 /** hard stop for new files (default 8 GB, well inside Cloudflare R2's free 10 GB) and an early warning (default 7 GB); both can be changed with STORAGE_CAP_GB / STORAGE_WARN_GB */
@@ -49,4 +49,25 @@ export async function afterStore() {
   const used = await storageUsed();
   if (used >= cap) await alertOnce("full", used, cap);
   else if (used >= warn) await alertOnce("warn", used, cap);
+}
+
+/** For the owner: how much is stored, by kind, against the cap and Cloudflare's free 10 GB. */
+export async function storageReport() {
+  const { cap, warn } = await limits();
+  const [memories, family] = await Promise.all([store.list(), familyStore.list()]);
+  const kinds = { image: { bytes: 0, count: 0 }, video: { bytes: 0, count: 0 }, audio: { bytes: 0, count: 0 }, extra: { bytes: 0, count: 0 } };
+  for (const m of [...memories, ...family])
+    for (const f of m.files) {
+      const k = kinds[f.kind] ?? kinds.image;
+      k.bytes += f.size;
+      k.count++;
+      // the small previews and a video's soundtrack, stored next to the files
+      const more = (f.thumbSize ?? 0) + (f.soundSize ?? 0);
+      if (more) {
+        kinds.extra.bytes += more;
+        kinds.extra.count++;
+      }
+    }
+  const used = kinds.image.bytes + kinds.video.bytes + kinds.audio.bytes + kinds.extra.bytes;
+  return { used, cap, warn, free: 10 * GB, kinds };
 }

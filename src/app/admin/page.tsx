@@ -1,5 +1,6 @@
 "use client";
 
+import StoragePanel from "./StoragePanel";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ExternalLink, Flag, Image as ImageIcon, LogOut, Mic, RefreshCw, Sparkles, Trash2, Undo2, Video, X } from "lucide-react";
@@ -498,6 +499,8 @@ export default function AdminPage() {
                 </li>
               </ol>
             </section>
+
+            <StoragePanel token={token} />
 
             <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2" role="group" aria-label="מה לנהל">
