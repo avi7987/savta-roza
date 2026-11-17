@@ -5,6 +5,7 @@ import { MODELS, budgetLeft, chat } from "@/server/ai";
 import { familySummary } from "@/server/familyFacts";
 import { nearest } from "@/server/semantic";
 import { phraseForAnswer } from "@/server/voice";
+import { rememberOpen } from "@/server/quiz";
 import { factStore, store } from "@/server/store";
 
 export const runtime = "nodejs";
@@ -61,7 +62,10 @@ export async function POST(req: Request) {
 
   // in her voice: what nobody has told the site yet, she has not "been told"
   const unknown = lang === "ru" ? "Этого мне пока никто не рассказал." : "את זה עוד לא סיפרו לי.";
-  if (!sourcesAll.length) return json({ answer: unknown, sources: [], known: false });
+  if (!sourcesAll.length) {
+    await rememberOpen(q).catch(() => {});
+    return json({ answer: unknown, sources: [], known: false });
+  }
 
   const label = { tree: "the family tree", fact: "verified fact", memory: "a family memory", note: "what the family told about a photo", ocr: "text read from a letter (may contain reading errors)", transcript: "transcript of a recording (may contain errors)" };
   const context = sourcesAll.map((s) => `[${s.n}] (${label[s.kind]}${s.author ? `, by ${s.author}` : ""}) ${s.text}`).join("\n");
@@ -128,5 +132,7 @@ ${context}`,
   // "nobody told me that yet", even in other words, is not an answer: the family is invited to tell it
   const notTold = text.includes(unknown) || /לא סיפרו לי|עוד לא יודעת|לא ידוע לי|не рассказал|пока не знаю|мне неизвестно/i.test(text);
   const known = used.length > 0 && !notTold;
+  // what she could not answer becomes one of her questions to the family ("grandma asks")
+  if (!known) await rememberOpen(q).catch(() => {});
   return json({ answer: known ? text : unknown, sources: known ? used : [], known });
 }

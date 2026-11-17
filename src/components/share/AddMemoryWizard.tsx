@@ -417,6 +417,14 @@ export default function AddMemoryWizard() {
     xhr.send(fd);
   };
 
+  // back on the site after sharing, grandma may ask one small thing ("grandma asks")
+  useEffect(() => {
+    if (state !== "done") return;
+    try {
+      sessionStorage.setItem("roza-quiz-engaged", "1");
+    } catch {}
+  }, [state]);
+
   const ids = { name: `${uid}-name`, rel: `${uid}-rel`, title: `${uid}-title`, mem: `${uid}-mem`, files: `${uid}-files` };
 
   if (state === "done")

@@ -125,6 +125,74 @@ function VoiceEditor({ token, onDone }: { token: string; onDone: (msg: string) =
   );
 }
 
+/** "Grandma asks": the small question cards visitors see; on or off, her questions, and what she could not answer */
+function QuizEditor({ token, onDone }: { token: string; onDone: (msg: string) => void }) {
+  const [d, setD] = useState<{ on: boolean; questions: string; open: { q: string; at: string }[] } | null>(null);
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    fetch("/api/admin/quiz", { headers: { "x-admin-token": token } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((x) => {
+        if (!x) return;
+        setD(x);
+        setText(x.questions);
+      })
+      .catch(() => {});
+  }, [token]);
+  const call = async (body: Record<string, unknown>, msg: string) => {
+    setBusy(true);
+    const r = await fetch("/api/admin/quiz", { method: "POST", headers: { "x-admin-token": token, "Content-Type": "application/json" }, body: JSON.stringify(body) }).catch(() => null);
+    setBusy(false);
+    if (!r?.ok) return onDone("השמירה לא הצליחה, נסו שוב");
+    const x = await r.json();
+    setD(x);
+    setText(x.questions);
+    onDone(msg);
+  };
+  if (!d) return null;
+  return (
+    <section className="flex flex-col gap-3 rounded-lg bg-white p-5 shadow-[var(--shadow-paper)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-display text-[1.35rem] text-burgundy">סבתא שואלת</h3>
+        <label className="inline-flex min-h-10 cursor-pointer items-center gap-2">
+          <input type="checkbox" checked={d.on} disabled={busy} onChange={(e) => call({ on: e.target.checked }, e.target.checked ? "השאלות של סבתא מופיעות שוב באתר" : "השאלות של סבתא כבויות")} className="h-5 w-5 accent-[var(--color-rose)]" />
+          להציג את השאלות באתר
+        </label>
+      </div>
+      <p className="max-w-3xl text-[0.95rem] text-ink-soft">
+        מי שנכנס לאתר מקבל מדי פעם כרטיס קטן עם שאלה אחת של סבתא: מתי צולמה תמונה, מי מופיע בה, מילים שלה, שנת לידה שחסרה בעץ, או אחת השאלות כאן. כל אחד מקבל כל שאלה רק פעם אחת. תשובות בכתב מגיעות לכאן
+        כהצעות לאישור, ותמונות מתעדכנות מיד עם שם מי שענה.
+      </p>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[0.95rem] text-charcoal">השאלות שלכם, כל שאלה בשורה (בגוף ראשון, כאילו סבתא שואלת)</span>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} dir="auto" className="w-full rounded-md border border-charcoal/20 bg-white px-3 py-2 leading-relaxed" />
+      </label>
+      <button type="button" onClick={() => call({ questions: text }, "השאלות נשמרו")} disabled={busy || text === d.questions} className="min-h-11 w-fit rounded-full bg-burgundy px-5 text-white disabled:opacity-40">
+        {busy ? "שומר…" : "שמירת השאלות"}
+      </button>
+      <div className="flex flex-col gap-2 pt-2">
+        <span className="text-[0.95rem] text-charcoal">שאלות ששאלו את סבתא והיא עוד לא ידעה לענות ({d.open.length})</span>
+        <span className="text-[0.85rem] text-ink-soft">הן נשאלות את המשפחה בכרטיסים. אחרי שמישהו עונה, השאלה יורדת מהרשימה.</span>
+        {d.open.length ? (
+          <ul className="flex flex-col divide-y divide-line rounded-md border border-line">
+            {d.open.map((o) => (
+              <li key={o.q} className="flex items-center justify-between gap-3 px-3 py-2">
+                <span dir="auto">{o.q}</span>
+                <button type="button" disabled={busy} onClick={() => call({ drop: o.q }, "השאלה הוסרה")} className="min-h-9 shrink-0 rounded-full border border-charcoal/20 px-3 text-[0.85rem]">
+                  להסיר
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span className="text-[0.9rem] text-ink-soft">אין כרגע.</span>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function KnowledgeManager({ token, onDone }: { token: string; onDone: (msg: string) => void }) {
   const [data, setData] = useState<Data | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number][0]>("pending");
@@ -167,6 +235,7 @@ export default function KnowledgeManager({ token, onDone }: { token: string; onD
       </p>
 
       <VoiceEditor token={token} onDone={onDone} />
+      <QuizEditor token={token} onDone={onDone} />
 
       <section className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg bg-white p-5 shadow-[var(--shadow-paper)]">
         <span className="flex items-center gap-2">

@@ -19,8 +19,11 @@ export function useAsk() {
     setBusy(true);
     setRes(null);
     const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q, lang }) }).catch(() => null);
-    setRes(r ? ((await r.json().catch(() => ({ error: "x" }))) as Answer) : { error: "x" });
+    const a = r ? ((await r.json().catch(() => ({ error: "x" }))) as Answer) : { error: "x" };
+    setRes(a);
     setBusy(false);
+    // after a while with her answer, she may have a question of her own ("grandma asks")
+    if (!("error" in a && a.error)) window.dispatchEvent(new CustomEvent("roza:engaged", { detail: { delay: 15000 } }));
   };
   return { ask, busy, res, reset: () => setRes(null) };
 }
