@@ -40,7 +40,7 @@
   --font-hand: var(--font-playpen), var(--font-caveat), cursive;
 
   /* spacing rhythm for sections */
-  --spacing-section: clamp(5rem, 11vw, 10rem);
+  --spacing-section: clamp(3rem, 5vw, 4.5rem);
   --spacing-gutter: clamp(1.25rem, 4vw, 3rem);
 
   --radius-photo: 2px;

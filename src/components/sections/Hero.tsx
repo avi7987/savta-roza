@@ -25,7 +25,7 @@ export default function Hero() {
 
 
   return (
-    <section id="top" ref={ref} aria-labelledby="hero-title" className="relative overflow-hidden pb-[clamp(4rem,9vw,8rem)] pt-[calc(4.5rem+env(safe-area-inset-top,0px))]">
+    <section id="top" ref={ref} aria-labelledby="hero-title" className="relative overflow-hidden pb-[clamp(3rem,6vw,5.5rem)] pt-[calc(4.5rem+env(safe-area-inset-top,0px))]">
       {/* soft daylight from the window side */}
       <div aria-hidden className="pointer-events-none absolute inset-0 [mask-image:linear-gradient(to_bottom,black_55%,transparent)] bg-[radial-gradient(60rem_40rem_at_85%_0%,rgba(232,212,211,0.55),transparent_70%),radial-gradient(40rem_30rem_at_0%_100%,rgba(167,181,160,0.12),transparent_70%)] rtl:bg-[radial-gradient(60rem_40rem_at_15%_0%,rgba(232,212,211,0.55),transparent_70%),radial-gradient(40rem_30rem_at_100%_100%,rgba(167,181,160,0.12),transparent_70%)]" />
 

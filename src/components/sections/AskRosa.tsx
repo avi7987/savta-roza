@@ -105,7 +105,7 @@ export default function AskRosa() {
   );
 
   return (
-    <section id="ask" aria-labelledby="ask-title" className="relative overflow-hidden py-[clamp(4rem,8vw,7rem)]">
+    <section id="ask" aria-labelledby="ask-title" className="relative overflow-hidden py-[clamp(3rem,6vw,5rem)]">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(48rem_22rem_at_50%_0%,rgba(232,212,211,0.6),transparent_70%),radial-gradient(30rem_18rem_at_50%_100%,rgba(167,181,160,0.14),transparent_70%)]" />
       <Container className="relative flex flex-col items-center gap-6 text-center">
         <motion.div initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ type: "spring", visualDuration: 0.6, bounce: 0.25 }}>
