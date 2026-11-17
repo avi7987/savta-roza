@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import { useId, type ReactNode } from "react";
-import { fadeUp, inView, stagger } from "@/lib/motion";
+import { fadeUp, inView, lineReveal, stagger } from "@/lib/motion";
 import { useLang } from "@/lib/i18n";
 
 export function cn(...c: (string | false | null | undefined)[]) {
@@ -20,10 +20,10 @@ export function Reveal({ children, className, delay = 0, as = "div" }: { childre
 }
 
 /** A child of <Reveal> that takes part in its stagger. */
-export function Item({ children, className, as = "div" }: { children: ReactNode; className?: string; as?: "div" | "p" | "h1" | "h2" | "h3" | "span" | "li" }) {
+export function Item({ children, className, as = "div", rise }: { children: ReactNode; className?: string; as?: "div" | "p" | "h1" | "h2" | "h3" | "span" | "li"; rise?: boolean }) {
   const Tag = motion[as];
   return (
-    <Tag className={className} variants={fadeUp}>
+    <Tag className={className} variants={rise ? lineReveal : fadeUp}>
       {children}
     </Tag>
   );
@@ -52,7 +52,7 @@ export function SectionIntro({
           <Item as="span" className="block">
             <Eyebrow>{eyebrow}</Eyebrow>
           </Item>
-          <Item as="h2" className="mt-4 text-[clamp(2.4rem,5.2vw,4.5rem)] font-light leading-[1.05] text-burgundy">
+          <Item as="h2" rise className="mt-4 text-[clamp(2.4rem,5.2vw,4.5rem)] font-light leading-[1.05] text-burgundy">
             <span id={id}>{title}</span>
           </Item>
         </div>
@@ -70,7 +70,7 @@ export function SectionIntro({
       <Item as="span">
         <Eyebrow>{eyebrow}</Eyebrow>
       </Item>
-      <Item as="h2" className="text-[clamp(2.4rem,5.2vw,4.5rem)] font-light leading-[1.05] text-burgundy">
+      <Item as="h2" rise className="text-[clamp(2.4rem,5.2vw,4.5rem)] font-light leading-[1.05] text-burgundy">
         <span id={id}>{title}</span>
       </Item>
       {lead && (

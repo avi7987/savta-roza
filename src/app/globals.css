@@ -195,3 +195,14 @@ html.lenis, html.lenis body { height: auto; }
 html[data-tree-full] .hide-under-tree { display: none; }
 html[data-tree-full] main,
 html[data-tree-full] #family { z-index: 75; }
+
+/* the opening comes in with the stylesheet, so it shows as soon as the page does (see Hero) */
+.hero-in { animation: hero-in var(--dur, 0.9s) cubic-bezier(0.22, 1, 0.36, 1) var(--d, 0s) both; }
+@keyframes hero-in { from { opacity: 0; transform: translateY(var(--y, 18px)); } }
+.hero-title { animation: hero-title 1.2s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; }
+@keyframes hero-title { from { opacity: 0; transform: translateY(26px); filter: blur(6px); } }
+.hero-glow { animation: hero-glow 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both; }
+@keyframes hero-glow { from { opacity: 0; transform: scale(0.92); } }
+@media (prefers-reduced-motion: reduce) {
+  .hero-in, .hero-title, .hero-glow { animation: none; }
+}

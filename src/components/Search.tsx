@@ -1,5 +1,6 @@
 "use client";
 
+import { useBackClose } from "@/lib/useBackClose";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { Mic, Search as SearchIcon, Sparkles, X } from "lucide-react";
@@ -20,6 +21,8 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
   const [results, setResults] = useState<Result[] | null>(null);
   const [busy, setBusy] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  // the phone's "back" closes the search instead of leaving the page
+  const release = useBackClose(true, onClose);
 
   useEffect(() => {
     getLenis()?.stop();
@@ -63,6 +66,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
         return;
       }
     }
+    release();
     onClose();
     window.location.href = `/#m-${r.memoryId}`;
   };
@@ -82,7 +86,7 @@ function SearchDialog({ onClose }: { onClose: () => void }) {
       <div className="mx-auto flex max-w-3xl flex-col px-[var(--spacing-gutter)] pb-16" style={{ paddingTop: "max(1rem, env(safe-area-inset-top))" }}>
         <TLink
           href="/#ask"
-          onClick={onClose}
+          onClick={() => (release(), onClose())}
           className="mt-3 inline-flex w-fit items-center gap-2 rounded-full bg-white/80 px-4 py-2 text-[0.95rem] text-burgundy ring-1 ring-blush hover:bg-white"
         >
           <Sparkles className="h-4 w-4 text-rose" strokeWidth={1.6} aria-hidden />

@@ -23,6 +23,12 @@ export const imageReveal: Variants = {
   show: { clipPath: "inset(0% 0% 0% 0%)", transition: { duration: 1.3, ease } },
 };
 
+/** a heading rising out of a line, as if from behind the edge of a page */
+export const lineReveal: Variants = {
+  hidden: { opacity: 0, y: "0.45em", clipPath: "inset(-10% -4% 100% -4%)" },
+  show: { opacity: 1, y: 0, clipPath: "inset(-10% -4% -30% -4%)", transition: { duration: 1.05, ease } },
+};
+
 export const stagger = (gap = 0.09, delay = 0): Variants => ({
   hidden: {},
   show: { transition: { staggerChildren: gap, delayChildren: delay } },

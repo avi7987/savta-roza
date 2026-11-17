@@ -199,11 +199,11 @@ export default function MemoryWall({ list }: { list: Memory[] }) {
           return (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
+              // each note is laid on the board and settles at its own slight angle, as if pinned
+              initial={reduce ? { opacity: 0, rotate: s.tilt } : { opacity: 0, y: -14, scale: 1.04, rotate: s.tilt * 4 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1, rotate: s.tilt }}
               viewport={{ once: true, margin: "0px 0px -8% 0px" }}
-              transition={{ duration: 0.8, delay: i * 0.07, ease: [0.22, 1, 0.36, 1] }}
-              style={{ rotate: s.tilt }}
+              transition={{ type: "spring", visualDuration: 0.7, bounce: 0.18, delay: 0.1 + i * 0.09, opacity: { duration: 0.4, delay: 0.1 + i * 0.09 } }}
               className={cn("relative", s.cls)}
               onPointerEnter={(e) => e.pointerType === "mouse" && (held.current = i)}
               onPointerLeave={(e) => e.pointerType === "mouse" && held.current === i && (held.current = -1)}
@@ -273,6 +273,29 @@ function Note({ m, shape, tone }: { m: Memory; shape: Shape; tone: number }) {
   const fade = "[mask-image:linear-gradient(to_bottom,black_70%,transparent)]";
 
   if (m.photoSrc && !m.mediaKind) {
+    // a wide note: a long story sits beside the photo; a short caption is laid on the photo itself,
+    // like a label on an album page, so the note never stands half empty
+    if (shape === "wide" && (m.title || body).length <= 140) {
+      return (
+        <article className={cn(card, "bg-white p-2")}>
+          <div className="relative h-full overflow-hidden rounded-[11px] bg-mount">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={m.photoSrc} alt="" aria-hidden loading="lazy" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-55 blur-xl" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={m.photoSrc} alt="" loading="lazy" className="relative h-full w-full object-contain transition-transform duration-700 group-hover:scale-[1.02]" />
+            <div className="absolute bottom-2.5 start-2.5 max-w-[60%] rounded-[10px] bg-paper/95 px-3 py-2 shadow-[0_6px_18px_-8px_rgba(70,35,45,0.45)] ring-1 ring-line">
+              {(m.title || body) && (
+                <p dir="auto" className="line-clamp-2 text-[0.92rem] leading-snug">
+                  {m.title ? <span className="font-display text-[1.02rem] text-burgundy">{m.title}</span> : body}
+                </p>
+              )}
+              <span className="block truncate font-hand text-[1.05rem] leading-tight text-[#a24a64]">{m.author}</span>
+            </div>
+          </div>
+          {open}
+        </article>
+      );
+    }
     const side = shape === "wide";
     return (
       <article className={cn(card, "bg-white p-2", side && "flex-row gap-3")}>

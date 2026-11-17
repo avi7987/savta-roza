@@ -1,5 +1,6 @@
 "use client";
 
+import { useBackClose } from "@/lib/useBackClose";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -61,6 +62,8 @@ export default function Header() {
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const menuBtn = useRef<HTMLButtonElement>(null);
+  // the phone's "back" closes the menu; a link in it leaves the menu's step behind so it is not undone
+  const release = useBackClose(open, () => setOpen(false));
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -182,7 +185,7 @@ export default function Header() {
             <nav aria-label={t.nav.menu} className="mt-10 flex flex-col">
               {LINKS.map((link, i) => (
                 <motion.div key={link.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.05, duration: 0.5, ease }}>
-                  <TLink href={link.href} onClick={() => setOpen(false)} className="flex items-baseline gap-4 border-b border-line py-4">
+                  <TLink href={link.href} onClick={() => (release(), setOpen(false))} className="flex items-baseline gap-4 border-b border-line py-4">
                     <span className="font-display text-[2.1rem] font-light leading-tight text-charcoal">{t.nav[link.key]}</span>
                   </TLink>
                 </motion.div>
@@ -190,7 +193,7 @@ export default function Header() {
             </nav>
             <div className="mt-auto flex flex-col gap-6 pt-10">
               <LanguageSwitcher large />
-              <TLink href="/share" onClick={() => setOpen(false)} className="inline-flex min-h-12 w-fit items-center rounded-full bg-rose px-7 text-white">
+              <TLink href="/share" onClick={() => (release(), setOpen(false))} className="inline-flex min-h-12 w-fit items-center rounded-full bg-rose px-7 text-white">
                 {t.nav.share}
               </TLink>
             </div>

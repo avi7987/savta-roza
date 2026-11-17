@@ -1,5 +1,6 @@
 "use client";
 
+import { useBackClose } from "@/lib/useBackClose";
 import dynamic from "next/dynamic";
 import { AnimatePresence, animate, motion, useDragControls, useMotionValue, type PanInfo } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -85,6 +86,7 @@ function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: str
   const all = photosOf(fam.photos, id);
   const alt = lang === "ru" ? (p.nameAlt ? p.name : undefined) : p.nameAlt;
 
+  useBackClose(true, onClose);
   useEffect(() => {
     getLenis()?.stop();
     closeRef.current?.focus();
@@ -265,6 +267,8 @@ export default function FamilyTree() {
       <Container wide>
         <SectionIntro id="family-title" eyebrow={t.family.eyebrow} title={t.family.title} lead={t.family.map.lead} layout="center" />
         <div className="mt-8 md:mt-12">
+          {/* until the page knows whether this is a phone, the tree's room is kept, so nothing below it jumps */}
+          {wide === null && <div aria-hidden className="h-[72svh] min-h-[28rem] rounded-[18px] border border-line bg-[#fbf7f2] md:h-[min(78vh,52rem)] md:min-h-[32rem]" />}
           {wide !== null && <FamilyMap phone={!wide} fam={fam} onOpen={onOpen} onAdd={(id) => onAdd({ of: id })} />}
           {wide === false && <p className="mt-2.5 text-center text-[0.82rem] text-ink-soft">{t.family.map.hintTouch}</p>}
         </div>

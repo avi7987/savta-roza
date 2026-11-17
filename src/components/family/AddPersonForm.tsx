@@ -1,5 +1,6 @@
 "use client";
 
+import { useBackClose } from "@/lib/useBackClose";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, Camera, Heart, Search, Users, Baby, UserRound, X } from "lucide-react";
@@ -61,6 +62,7 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [state, setState] = useState<"idle" | "sending" | "done" | "error" | "full">("idle");
 
+  useBackClose(true, onClose);
   useEffect(() => {
     getLenis()?.stop();
     closeRef.current?.focus();

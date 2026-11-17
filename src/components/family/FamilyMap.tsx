@@ -1,5 +1,6 @@
 "use client";
 
+import { useBackClose } from "@/lib/useBackClose";
 import "@xyflow/react/dist/style.css";
 import { MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -71,7 +72,9 @@ const LinesNode = memo(function LinesNode({ data }: NodeProps<Node<LinesData>>) 
   const w = layout.width + BAND;
   const x0 = rtl ? 0 : -BAND;
   return (
-    <svg width={layout.width} height={layout.height} className="pointer-events-none overflow-visible" aria-hidden>
+    // the strip with the generations' names is part of the drawing, so "the whole tree" keeps it in view
+    <svg width={layout.width + BAND} height={layout.height} className="pointer-events-none overflow-visible" aria-hidden>
+      <g transform={`translate(${rtl ? 0 : BAND},0)`}>
       {labels.map((b) => (
         <g key={b.y}>
           <line x1={x0} x2={x0 + w} y1={b.y - 48} y2={b.y - 48} stroke="var(--color-rail)" strokeDasharray="2 6" strokeOpacity={0.7} />
@@ -118,6 +121,7 @@ const LinesNode = memo(function LinesNode({ data }: NodeProps<Node<LinesData>>) 
       {layout.junctions.map((j) => (
         <circle key={j.id} cx={j.x} cy={j.y} r={5} fill="var(--color-paper)" stroke="var(--color-rail)" strokeWidth={1.6} strokeDasharray="2 2" />
       ))}
+      </g>
     </svg>
   );
 });
@@ -150,6 +154,7 @@ function Board({ fam, onOpen, onAdd, phone = false }: Props) {
   const ready = useRef(false);
   // on a phone the tree can take the whole screen, so a finger has room to move around it
   const [full, setFull] = useState(false);
+  useBackClose(full, () => setFull(false));
   useEffect(() => {
     if (!full) return;
     // Escape leaves the full screen, unless it is closing a person's card on top of it
@@ -281,7 +286,7 @@ function Board({ fam, onOpen, onAdd, phone = false }: Props) {
   }, [onOpen]);
 
   const nodes = useMemo<Node[]>(() => {
-    const list: Node[] = [{ id: "__lines", type: "lines", position: { x: 0, y: 0 }, data: { layout, lit, path, fam, labels, rtl: dir === "rtl", selected }, draggable: false, selectable: false, focusable: false, zIndex: 0, width: layout.width, height: layout.height, style: { pointerEvents: "none" } }];
+    const list: Node[] = [{ id: "__lines", type: "lines", position: { x: dir === "rtl" ? 0 : -BAND, y: 0 }, data: { layout, lit, path, fam, labels, rtl: dir === "rtl", selected }, draggable: false, selectable: false, focusable: false, zIndex: 0, width: layout.width + BAND, height: layout.height, style: { pointerEvents: "none" } }];
     for (const c of layout.cards) {
       const hasKids = fam.graph.childrenOf(c.id).length > 0 || c.hidden > 0;
       list.push({
@@ -326,7 +331,7 @@ function Board({ fam, onOpen, onAdd, phone = false }: Props) {
     const box = document.querySelector<HTMLElement>(".family-map")?.getBoundingClientRect();
     if (!box) return;
     ready.current = true;
-    const fit = Math.min(1, (box.width * 0.9) / layout.width, (box.height * 0.85) / layout.height);
+    const fit = Math.min(1, (box.width * 0.9) / (layout.width + BAND), (box.height * 0.85) / layout.height);
     const rosa = at.get(ROSA);
     if (fit >= (phone ? 0.5 : 0.55) || !rosa) flow.fitView({ padding: 0.1, maxZoom: 1 });
     else {

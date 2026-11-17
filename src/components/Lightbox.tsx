@@ -1,6 +1,7 @@
 "use client";
 
-import { AnimatePresence, motion, useAnimate, useReducedMotion, type PanInfo } from "motion/react";
+import { useBackClose } from "@/lib/useBackClose";
+import { AnimatePresence, animate as tween, motion, useAnimate, useMotionValue, useReducedMotion, type PanInfo } from "motion/react";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { Photo } from "@/content/types";
@@ -66,6 +67,8 @@ function ImageLightbox({ photos, index, origin, onIndex, onClose }: { photos: Ph
   const { open } = useLightbox();
   const closeRef = useRef<HTMLButtonElement>(null);
   const [direction, setDirection] = useState(0);
+  // while the photo is enlarged, a finger moves around it instead of turning to the next one
+  const [zoomed, setZoomed] = useState(false);
   // what changed while the viewer is open (a date, a note), on top of the list it was opened with
   const [patches, setPatches] = useState<Record<string, Partial<Photo>>>({});
   const base = photos[index];
@@ -104,6 +107,8 @@ function ImageLightbox({ photos, index, origin, onIndex, onClose }: { photos: Ph
     }
     onClose();
   }, [animate, home, onClose, reduce]);
+  // the phone's "back" closes the photo (flying back onto its print) instead of leaving the page
+  useBackClose(true, closeView);
 
   const go = useCallback(
     (step: number) => {
@@ -193,7 +198,7 @@ function ImageLightbox({ photos, index, origin, onIndex, onClose }: { photos: Ph
               animate={{ opacity: 1, x: 0, scale: 1 }}
               exit={{ opacity: 0, x: -direction * shift }}
               transition={{ duration: 0.5, ease }}
-              drag={many ? "x" : false}
+              drag={many && !zoomed ? "x" : false}
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.4}
               onDragEnd={onDragEnd}
@@ -208,7 +213,8 @@ function ImageLightbox({ photos, index, origin, onIndex, onClose }: { photos: Ph
                 <video key={photo.full} src={photo.full} poster={photo.src} controls playsInline preload="metadata" className="max-h-[56svh] w-auto max-w-full rounded-[6px] bg-black lg:max-h-[82svh]" style={{ aspectRatio: photo.ratio }} />
               ) : shared ? (
                 // sized from its known shape before the large file arrives, so it can grow straight out of the print
-                // eslint-disable-next-line @next/next/no-img-element
+                <Zoomable onZoom={setZoomed}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   ref={bigImg}
                   src={photo.full ?? photo.src}
@@ -217,9 +223,12 @@ function ImageLightbox({ photos, index, origin, onIndex, onClose }: { photos: Ph
                   className="select-none bg-cover bg-center object-contain [--mh:56svh] lg:[--mh:84svh] lg:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.6)]"
                   style={{ aspectRatio: photo.ratio, width: `min(100%, calc(var(--mh) * ${photo.ratio}))`, borderRadius: 4, backgroundImage: `url("${photo.src}")`, transformOrigin: "50% 50%" }}
                 />
+                </Zoomable>
               ) : uploaded ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photo.full ?? photo.src} alt={l(photo.alt)} className="max-h-[56svh] w-auto max-w-full select-none rounded-[4px] object-contain lg:max-h-[84svh] lg:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.6)]" draggable={false} />
+                <Zoomable onZoom={setZoomed}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo.full ?? photo.src} alt={l(photo.alt)} className="max-h-[56svh] w-auto max-w-full select-none rounded-[4px] object-contain lg:max-h-[84svh] lg:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.6)]" draggable={false} />
+                </Zoomable>
               ) : (
                 <div className="w-full max-w-3xl">
                   <ArchivalImage photo={{ ...photo, src: photo.full ?? photo.src }} reveal={false} sizes="90vw" />
@@ -252,6 +261,83 @@ function ImageLightbox({ photos, index, origin, onIndex, onClose }: { photos: Ph
           </div>
         )}
       </motion.aside>
+    </motion.div>
+  );
+}
+
+/**
+ * A photo that can be looked at closely: two fingers spread it open (up to four times its size), a
+ * double tap or double click enlarges it around that spot or brings it back, and while it is
+ * enlarged a finger or the mouse moves around it.
+ */
+function Zoomable({ children, onZoom }: { children: ReactNode; onZoom: (z: boolean) => void }) {
+  const scale = useMotionValue(1);
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const box = useRef<HTMLDivElement>(null);
+  const [zoomed, setZoomed] = useState(false);
+  const pinch = useRef<{ d: number; s: number } | null>(null);
+  const lastTap = useRef(0);
+  // a phone follows a double tap with a double click of its own; that one is not a second request
+  const touchedAt = useRef(0);
+  const spring = { type: "spring", visualDuration: 0.35, bounce: 0 } as const;
+  const mark = (z: boolean) => {
+    setZoomed(z);
+    onZoom(z);
+  };
+  const reset = () => {
+    tween(scale, 1, spring);
+    tween(x, 0, spring);
+    tween(y, 0, spring);
+    mark(false);
+  };
+  // enlarge so the spot under the finger stays under it
+  const zoomAt = (cx: number, cy: number) => {
+    const r = box.current?.getBoundingClientRect();
+    if (!r) return;
+    const k = 2.5;
+    tween(scale, k, spring);
+    tween(x, (r.left + r.width / 2 - cx) * (k - 1), spring);
+    tween(y, (r.top + r.height / 2 - cy) * (k - 1), spring);
+    mark(true);
+  };
+  const toggleAt = (cx: number, cy: number) => (zoomed ? reset() : zoomAt(cx, cy));
+  const dist = (t: React.TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+
+  return (
+    <motion.div
+      ref={box}
+      style={{ scale, x, y, touchAction: zoomed ? "none" : "pan-y" }}
+      drag={zoomed}
+      dragMomentum={false}
+      dragElastic={0.05}
+      onDoubleClick={(e) => Date.now() - touchedAt.current > 800 && toggleAt(e.clientX, e.clientY)}
+      onTouchStart={(e) => {
+        touchedAt.current = Date.now();
+        if (e.touches.length === 2) pinch.current = { d: dist(e.touches), s: scale.get() };
+        else if (e.touches.length === 1) {
+          const now = Date.now();
+          if (now - lastTap.current < 300) {
+            toggleAt(e.touches[0].clientX, e.touches[0].clientY);
+            lastTap.current = 0;
+          } else lastTap.current = now;
+        }
+      }}
+      onTouchMove={(e) => {
+        if (!pinch.current || e.touches.length !== 2) return;
+        const s = Math.min(4, Math.max(1, (pinch.current.s * dist(e.touches)) / pinch.current.d));
+        scale.set(s);
+        if (s > 1.02 && !zoomed) mark(true);
+      }}
+      onTouchEnd={(e) => {
+        // a pinch let go almost where it started goes back to the whole photo
+        const pinched = !!pinch.current;
+        if (e.touches.length < 2) pinch.current = null;
+        if (pinched && !e.touches.length && scale.get() < 1.08) reset();
+      }}
+      className={zoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"}
+    >
+      {children}
     </motion.div>
   );
 }
