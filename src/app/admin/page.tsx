@@ -313,9 +313,9 @@ export default function AdminPage() {
     try {
       const get = (k: Kind) => fetch(`/api/admin/memories?status=all&kind=${k}`, { headers: { "x-admin-token": tk } });
       const [m, f] = await Promise.all([get("memories"), get("family")]);
-      if (m.status === 401) {
+      if (m.status === 401 || m.status === 429) {
         setAuthed(false);
-        setError("הסיסמה לא נכונה. אחרי כמה ניסיונות שגויים הכניסה ננעלת לרבע שעה.");
+        setError(m.status === 429 ? "היו כאן יותר מדי ניסיונות שגויים, אז הכניסה ננעלה לרבע שעה. נסו שוב אחר כך, עם הסיסמה המדויקת." : "הסיסמה לא נכונה. כדאי להעתיק ולהדביק אותה במקום להקליד. אחרי 10 ניסיונות שגויים הכניסה ננעלת לרבע שעה.");
         try {
           sessionStorage.removeItem("roza-admin");
         } catch {}
@@ -474,7 +474,7 @@ export default function AdminPage() {
               }}
             >
               <label htmlFor="tk">סיסמת ניהול</label>
-              <input id="tk" type="password" autoComplete="current-password" value={token} onChange={(e) => setToken(e.target.value)} className="rounded-md border border-charcoal/20 bg-white px-4 py-3 text-left" dir="ltr" />
+              <input id="tk" type="password" autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={token} onChange={(e) => setToken(e.target.value)} className="rounded-md border border-charcoal/20 bg-white px-4 py-3 text-left" dir="ltr" />
               <button type="submit" disabled={busy || !token} className="mt-2 min-h-12 rounded-full bg-rose text-white transition-colors hover:bg-burgundy disabled:opacity-50">
                 {busy ? "נכנסים…" : "כניסה"}
               </button>

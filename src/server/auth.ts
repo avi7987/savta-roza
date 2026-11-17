@@ -26,9 +26,14 @@ const same = (x: string, y: string) => {
 const ipOf = (req: Request) => req.headers.get("cf-connecting-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
 const misses = new Map<string, number[]>();
 const LOCK_WINDOW = 15 * 60 * 1000;
-const LOCK_AFTER = 20; // requests; one wrong try on the admin page makes a few
+const LOCK_AFTER = 10; // wrong tries
 const locked = (ip: string) => (misses.get(ip) ?? []).filter((t) => Date.now() - t < LOCK_WINDOW).length >= LOCK_AFTER;
-const miss = (ip: string) => misses.set(ip, [...(misses.get(ip) ?? []).filter((t) => Date.now() - t < LOCK_WINDOW), Date.now()]);
+// one try on the admin page sends a few requests at once: they count as one
+const miss = (ip: string) => {
+  const list = (misses.get(ip) ?? []).filter((t) => Date.now() - t < LOCK_WINDOW);
+  if (!list.length || Date.now() - list[list.length - 1] > 3000) list.push(Date.now());
+  misses.set(ip, list);
+};
 
 // the slow hash is worked out once per password for a while, not on every request of the admin page
 const good = new Map<string, number>();
