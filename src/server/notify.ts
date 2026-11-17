@@ -18,7 +18,8 @@ export async function setting(name: string): Promise<string | undefined> {
  */
 export async function emailOwner(subject: string, html: string) {
   const key = await setting("RESEND_API_KEY");
-  const to = await setting("ALERT_EMAIL");
+  // the address chosen in the admin page, else the one in Cloudflare's settings
+  const to = (await alertEmail()) ?? (await setting("ALERT_EMAIL"));
   if (!key || !to) {
     console.warn(`[alert] not sent (RESEND_API_KEY / ALERT_EMAIL missing): ${subject}`);
     return false;
@@ -36,5 +37,16 @@ export async function emailOwner(subject: string, html: string) {
   } catch (e) {
     console.warn("[alert] email failed", e);
     return false;
+  }
+}
+
+/** the address the owner chose for alerts, in the admin page */
+export async function alertEmail() {
+  try {
+    const { store } = await import("./store");
+    const v = (await store.getMeta("alert-email"))?.trim();
+    return v || undefined;
+  } catch {
+    return undefined;
   }
 }

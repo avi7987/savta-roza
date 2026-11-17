@@ -2,6 +2,7 @@
 
 import StoragePanel from "./StoragePanel";
 import PasswordPanel from "./PasswordPanel";
+import Tools from "./tools/Tools";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ExternalLink, Flag, Image as ImageIcon, LogOut, Mic, RefreshCw, Sparkles, Trash2, Undo2, Video, X } from "lucide-react";
@@ -100,7 +101,7 @@ function FileMeta({ memoryId, file, token, onSaved }: { memoryId: string; file: 
 }
 
 type Kind = "memories" | "family";
-type Section = "removals" | "memories" | "family" | "people" | "knowledge" | "story";
+type Section = "removals" | "memories" | "family" | "people" | "knowledge" | "story" | "tools";
 type Item = StoredMemory | StoredPerson;
 
 const TABS: { id: Status; label: string; empty: string }[] = [
@@ -524,6 +525,7 @@ export default function AdminPage() {
                     ["people", "אנשים", 0],
                     ["knowledge", "ידע על רוזה", 0],
                     ["story", "סיפור החיים", 0],
+                    ["tools", "כלים", 0],
                   ] as [Section, string, number][]
                 ).map(([k, label, n]) => (
                   <button
@@ -548,6 +550,8 @@ export default function AdminPage() {
             </div>
 
             {error && <p role="alert" className="mt-4 text-burgundy">{error}</p>}
+
+            {section === "tools" && <Tools token={token} />}
 
             {section === "people" && (
               <PeopleManager

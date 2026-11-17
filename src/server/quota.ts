@@ -69,5 +69,5 @@ export async function storageReport() {
       }
     }
   const used = kinds.image.bytes + kinds.video.bytes + kinds.audio.bytes + kinds.extra.bytes;
-  return { used, cap, warn, free: 10 * GB, kinds };
+  return { used, cap, warn, free: 10 * GB, kinds, lastBackup: (await store.getMeta("backup-at")) ?? null };
 }
