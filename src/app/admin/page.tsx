@@ -1,6 +1,7 @@
 "use client";
 
 import StoragePanel from "./StoragePanel";
+import PasswordPanel from "./PasswordPanel";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ExternalLink, Flag, Image as ImageIcon, LogOut, Mic, RefreshCw, Sparkles, Trash2, Undo2, Video, X } from "lucide-react";
@@ -314,7 +315,7 @@ export default function AdminPage() {
       const [m, f] = await Promise.all([get("memories"), get("family")]);
       if (m.status === 401) {
         setAuthed(false);
-        setError("הסיסמה לא נכונה. בדקו שהעתקתם אותה במלואה.");
+        setError("הסיסמה לא נכונה. אחרי כמה ניסיונות שגויים הכניסה ננעלת לרבע שעה.");
         try {
           sessionStorage.removeItem("roza-admin");
         } catch {}
@@ -501,6 +502,17 @@ export default function AdminPage() {
             </section>
 
             <StoragePanel token={token} />
+            <PasswordPanel
+              token={token}
+              onChanged={(pw) => {
+                setToken(pw);
+                try {
+                  sessionStorage.setItem("roza-admin", pw);
+                } catch {}
+                setToast("הסיסמה החדשה נשמרה");
+                setTimeout(() => setToast(""), 4200);
+              }}
+            />
 
             <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap gap-2" role="group" aria-label="מה לנהל">
