@@ -40,7 +40,8 @@ export type StoredFile = {
 };
 
 /** One family member's answer to "tell us more about this photo". Human-provided, attributed, never merged silently. */
-export type FileNote = { at: string; by?: string; people?: string[]; who?: string; when?: string; place?: string; what?: string };
+/** was: the date the photo had before someone corrected it, kept so the change can be seen and undone */
+export type FileNote = { at: string; by?: string; people?: string[]; who?: string; when?: string; was?: string; place?: string; what?: string };
 
 export type DeleteRequest = { at: string; reason?: string; by?: string };
 

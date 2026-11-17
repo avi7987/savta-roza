@@ -40,7 +40,7 @@ export type Photo = {
   /** what is said in a video or recording, written down by the computer */
   transcript?: string;
   /** what family members told about it ("tell us more") */
-  notes?: { at: string; by?: string; people?: string[]; who?: string; when?: string; place?: string; what?: string }[];
+  notes?: { at: string; by?: string; people?: string[]; who?: string; when?: string; was?: string; place?: string; what?: string }[];
   when?: PhotoDate;
   memoryId?: string;
   /** stored file name within the memory (for dating and removal requests) */

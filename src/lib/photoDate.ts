@@ -36,7 +36,8 @@ export function cleanDate(d: Partial<PhotoDate> | undefined, source: DateSource)
   const date = validDate(d.date);
   let year = validYear(d.year) ?? (date ? Number(date.slice(0, 4)) : undefined);
   let from = validYear(d.from);
-  let to = validYear(d.to);
+  // the decade we live in has not ended yet: "the 2020s" runs until this year
+  let to = validYear(d.to) ?? (from && Number(d.to) > thisYear() && Number(d.to) - from < 10 ? thisYear() : undefined);
   if (from && to && from > to) [from, to] = [to, from];
   if (from && to && to - from > 40) return undefined;
   if (!year && from && to && from === to) year = from;

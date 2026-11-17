@@ -123,6 +123,7 @@ export function Question({ card, by, onAnswered, onSkip, bare }: { card: Card; b
   const [text, setText] = useState("");
   const [extra, setExtra] = useState("");
   const [year, setYear] = useState("");
+  const [decade, setDecade] = useState<number | null>(null);
   const [people, setPeople] = useState<string[]>([]);
   const [newNames, setNewNames] = useState<string[]>([]);
   const [audio, setAudio] = useState<File | null>(null);
@@ -168,6 +169,11 @@ export function Question({ card, by, onAnswered, onSkip, bare }: { card: Card; b
   const photoInfo = (extra: Record<string, unknown>) => post("/api/photos/bulk-info", { items: [{ memoryId: photo!.memoryId, file: photo!.file }], by: who || undefined, ...extra });
 
   const submit = () => {
+    // a decade is chosen first and saved with the button, so a stray tap while scrolling the row saves nothing
+    if (card.kind === "photo-when") {
+      if (!decade) return setErr(q.needDecade);
+      return run(async () => (await photoInfo({ decade })) && (refreshPhotos(), true), false);
+    }
     if (card.kind === "photo-who") {
       if (!people.length && !newNames.length) return setErr(q.needWho);
       return run(async () => {
@@ -226,7 +232,7 @@ export function Question({ card, by, onAnswered, onSkip, bare }: { card: Card; b
         // one row that scrolls sideways on a phone, so the card stays small
         <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           {DECADES.map((d) => (
-            <button key={d} type="button" disabled={sending} onClick={() => run(async () => (await photoInfo({ decade: d })) && (refreshPhotos(), true), false)} className="min-h-10 shrink-0 rounded-full bg-white px-3.5 text-[0.92rem] text-charcoal ring-1 ring-charcoal/10 transition-colors hover:bg-blush/50 hover:text-burgundy disabled:opacity-50">
+            <button key={d} type="button" disabled={sending} aria-pressed={decade === d} onClick={() => (setDecade(decade === d ? null : d), setErr(""))} className={cn("min-h-10 shrink-0 rounded-full px-3.5 text-[0.92rem] ring-1 transition-colors disabled:opacity-50", decade === d ? "bg-burgundy text-white ring-burgundy" : "bg-white text-charcoal ring-charcoal/10 hover:bg-blush/50 hover:text-burgundy")}>
               {decadeLabel(d, lang)}
             </button>
           ))}
@@ -254,11 +260,11 @@ export function Question({ card, by, onAnswered, onSkip, bare }: { card: Card; b
       {(card.kind === "fact" || card.kind === "memory") && <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} maxLength={1500} dir="auto" placeholder={q.answerPh} aria-label={question} className={cn(field, "resize-none")} />}
       {canRecord && <Recorder file={audio} onFile={setAudio} />}
 
-      {card.kind !== "photo-when" && (
+      {(card.kind !== "photo-when" || decade) && (
         <div className="flex flex-col gap-2">
-          {!by && <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="name" placeholder={q.name} aria-label={q.name} aria-invalid={err === q.needName} className={cn(field, "min-h-11 py-2 aria-[invalid=true]:border-burgundy")} />}
+          {!by && card.kind !== "photo-when" && <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="name" placeholder={q.name} aria-label={q.name} aria-invalid={err === q.needName} className={cn(field, "min-h-11 py-2 aria-[invalid=true]:border-burgundy")} />}
           <button type="button" onClick={submit} disabled={sending} className={cn(buttonClass.primary, "min-h-11 w-full justify-center")}>
-            {sending ? q.sending : card.kind === "photo-who" ? q.save : q.send}
+            {sending ? q.sending : card.kind === "photo-who" || card.kind === "photo-when" ? q.save : q.send}
           </button>
         </div>
       )}

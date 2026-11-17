@@ -31,14 +31,18 @@ export async function POST(req: Request) {
   const year = Number(b.year);
   const decade = Number(b.decade);
   const date = Number.isInteger(year) && year > 0 ? cleanDate({ year }, "user") : Number.isInteger(decade) && decade > 0 ? cleanDate({ from: decade, to: decade + 9 }, "user") : undefined;
-  const canDate = !f.date || f.date.source === "ai";
+  // someone who signs their name may correct a date already given; the earlier one stays in the note
+  const by = text(b.by, LIMITS.name);
+  const fixing = !!date && !!f.date && f.date.source !== "ai" && b.fix === true && !!by && by.length >= 2;
+  const canDate = !f.date || f.date.source === "ai" || fixing;
 
   const note: FileNote = {
     at: new Date().toISOString(),
-    by: text(b.by, LIMITS.name),
+    by,
     people: people.length ? people : undefined,
     who: text(b.who, 300),
     when: date ? formatDate(date, "he") : text(b.when, 80),
+    was: fixing ? formatDate(f.date!, "he") : undefined,
     place: text(b.place, 160),
     what: text(b.what, 2000),
   };

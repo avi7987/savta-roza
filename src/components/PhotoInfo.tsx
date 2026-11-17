@@ -31,13 +31,16 @@ function TellMore({ photo, onSaved, onCancel }: { photo: Photo; onSaved: (n: Not
   const [place, setPlace] = useState("");
   const [what, setWhat] = useState("");
   const [by, setBy] = useState(myName);
-  const [state, setState] = useState<"idle" | "sending" | "failed" | "empty">("idle");
-  const canDate = !photo.when || photo.when.source === "ai";
+  const [state, setState] = useState<"idle" | "sending" | "failed" | "empty" | "name">("idle");
+  const [fixing, setFixing] = useState(false);
+  // no date yet (or only a machine guess); or someone wants to correct the date already given
+  const canDate = !photo.when || photo.when.source === "ai" || fixing;
   const decadeLabel = (d: number) => (lang === "ru" ? `${d}-е` : d >= 2000 ? `שנות ה־${d}` : `שנות ה־${String(d).slice(2)}`);
 
   const send = async () => {
     const added = people.filter((id) => !(photo.people ?? []).includes(id));
     if (!added.length && !newNames.length && !decade && !year && !place.trim() && !what.trim()) return setState("empty");
+    if (fixing && (decade || year) && by.trim().length < 2) return setState("name");
     setState("sending");
     try {
       localStorage.setItem(NAME_KEY, by.trim());
@@ -45,7 +48,7 @@ function TellMore({ photo, onSaved, onCancel }: { photo: Photo; onSaved: (n: Not
     const r = await fetch("/api/photos/info", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ memoryId: photo.memoryId, file: photo.file, people: added, newPeople: newNames, decade: canDate && !year ? decade : undefined, year: canDate && year ? Number(year) : undefined, place, what, by }),
+      body: JSON.stringify({ memoryId: photo.memoryId, file: photo.file, people: added, newPeople: newNames, decade: canDate && !year ? decade : undefined, year: canDate && year ? Number(year) : undefined, fix: fixing || undefined, place, what, by }),
     }).catch(() => null);
     if (!r?.ok) return setState("failed");
     const d = (await r.json()) as { file?: { notes?: Note[]; date?: PhotoDate } };
@@ -79,9 +82,14 @@ function TellMore({ photo, onSaved, onCancel }: { photo: Photo; onSaved: (n: Not
         }}
       />
 
+      {photo.when && photo.when.source !== "ai" && !fixing && (
+        <button type="button" onClick={() => setFixing(true)} className="w-fit text-start text-[0.95rem] text-burgundy underline decoration-dusty/50 underline-offset-4 hover:decoration-burgundy">
+          {t.info.fixDate(formatDate(photo.when, lang))}
+        </button>
+      )}
       {canDate && (
         <fieldset className="flex flex-col gap-2">
-          <legend className={cn(label, "mb-2")}>{t.info.when}</legend>
+          <legend className={cn(label, "mb-2")}>{fixing ? t.info.fixTitle : t.info.when}</legend>
           <div className="flex flex-wrap gap-1.5">
             {DECADES.map((d) => (
               <button key={d} type="button" aria-pressed={decade === d} onClick={() => setDecade(decade === d ? null : d)} className={cn("min-h-10 rounded-full px-3.5 text-[0.92rem] tabular-nums", decade === d ? "bg-burgundy text-white" : "bg-ivory text-charcoal ring-1 ring-charcoal/10")}>
@@ -109,6 +117,7 @@ function TellMore({ photo, onSaved, onCancel }: { photo: Photo; onSaved: (n: Not
       </label>
 
       {state === "empty" && <p role="alert" className="text-burgundy">{t.info.empty}</p>}
+      {state === "name" && <p role="alert" className="text-burgundy">{t.info.fixName}</p>}
       {state === "failed" && <p role="alert" className="text-burgundy">{t.info.failed}</p>}
       <div className="flex flex-wrap gap-3">
         <button type="submit" disabled={state === "sending"} className="min-h-12 flex-1 rounded-full bg-rose px-6 text-[1.05rem] text-white transition-colors hover:bg-burgundy disabled:opacity-60">
@@ -195,7 +204,7 @@ export default function PhotoInfo({ photo, onChange, onJump }: { photo: Photo; o
               <li key={n.at} className="rounded-xl bg-white/70 p-4 ring-1 ring-charcoal/5">
                 {n.what && <p dir="auto" className="whitespace-pre-line leading-relaxed">{n.what}</p>}
                 <p className="mt-1 text-[0.9rem] text-charcoal/80">
-                  {[n.when && `${t.info.whenShort}: ${n.when}`, n.place && `${t.info.whereShort}: ${n.place}`, (n.people?.length || n.who) && `${t.info.whoShort}: ${[...(n.people ?? []).map(labelOf), n.who].filter(Boolean).join(", ")}`].filter(Boolean).join(" · ")}
+                  {[n.when && `${t.info.whenShort}: ${n.when}${n.was ? ` (${t.info.was} ${n.was})` : ""}`, n.place && `${t.info.whereShort}: ${n.place}`, (n.people?.length || n.who) && `${t.info.whoShort}: ${[...(n.people ?? []).map(labelOf), n.who].filter(Boolean).join(", ")}`].filter(Boolean).join(" · ")}
                 </p>
                 <p className="mt-1 text-[0.8rem] text-ink-soft">— {n.by || t.info.someone}</p>
               </li>

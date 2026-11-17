@@ -29,7 +29,7 @@ export async function GET() {
           year: sortYear(f.date),
           category: f.category,
           people: Array.from(new Set([...(m.people ?? []), ...(f.people ?? [])])),
-          notes: (f.notes ?? []).map((n) => ({ at: n.at, by: n.by, who: n.who, when: n.when, place: n.place, what: n.what, people: n.people })),
+          notes: (f.notes ?? []).map((n) => ({ at: n.at, by: n.by, who: n.who, when: n.when, was: n.was, place: n.place, what: n.what, people: n.people })),
           contributor: m.author,
           caption: m.title,
           memoryId: m.id,

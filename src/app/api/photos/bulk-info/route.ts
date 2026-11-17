@@ -30,6 +30,7 @@ export async function POST(req: Request) {
   const decade = Number(b.decade);
   const date = Number.isInteger(year) && year > 1850 ? cleanDate({ year }, "user") : Number.isInteger(decade) && decade > 1850 ? cleanDate({ from: decade, to: decade + 9 }, "user") : undefined;
   if (!people.length && !date) return NextResponse.json({ error: "empty" }, { status: 422 });
+  const fix = b.fix === true && !!by && by.length >= 2;
 
   // one change per memory, with all its chosen files
   const byMemory = new Map<string, Set<string>>();
@@ -44,8 +45,11 @@ export async function POST(req: Request) {
       ...cur,
       files: cur.files.map((f) => {
         if (!files.has(f.name)) return f;
-        const canDate = !!date && (!f.date || f.date.source === "ai");
-        const note: FileNote = { at: new Date().toISOString(), by, people: people.length ? people : undefined, when: canDate ? formatDate(date, "he") : undefined };
+        // a date fills in a photo with none (or only a machine estimate); someone who signs their name
+        // may also correct one already given, and the earlier date stays in the note
+        const fixing = !!date && !!f.date && f.date.source !== "ai" && fix;
+        const canDate = !!date && (!f.date || f.date.source === "ai" || fixing);
+        const note: FileNote = { at: new Date().toISOString(), by, people: people.length ? people : undefined, when: canDate ? formatDate(date, "he") : undefined, was: fixing ? formatDate(f.date!, "he") : undefined };
         changed++;
         if (canDate) dated++;
         return {

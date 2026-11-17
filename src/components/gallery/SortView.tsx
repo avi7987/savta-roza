@@ -64,7 +64,7 @@ export default function SortView() {
     const r = await fetch("/api/photos/bulk-info", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, people, newPeople: newNames, decade: year ? undefined : decade, year: year ? Number(year) : undefined, by }),
+      body: JSON.stringify({ items, people, newPeople: newNames, decade: year ? undefined : decade, year: year ? Number(year) : undefined, by, fix: true }),
     }).catch(() => null);
     if (!r?.ok) return setState({ kind: "failed" });
     const d = (await r.json()) as { changed: number };
