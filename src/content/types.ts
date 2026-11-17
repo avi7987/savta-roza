@@ -111,6 +111,8 @@ export type Memory = {
   translation?: string;
   photoId?: string;
   photoSrc?: string;
+  /** the photo's width / height, when known */
+  photoRatio?: number;
   mediaKind?: "video" | "audio";
   mediaSrc?: string;
   /** what is said in the recording or video, written down by the computer (may contain errors) */

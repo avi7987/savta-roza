@@ -53,6 +53,8 @@ const publicShape = (m: StoredMemory, texts: StoredText[] = []) => {
     createdAt: m.createdAt,
     photoSrc: image ? url(image.thumb ?? image.name) : undefined,
     photoFull: image ? url(image.name) : undefined,
+    // width / height, so the wall can give a photo a note of its own shape
+    photoRatio: image?.width && image?.height ? Math.round((image.width / image.height) * 100) / 100 : undefined,
     people: m.people,
     mediaKind: media?.kind,
     mediaSrc: media ? url(media.name) : undefined,
