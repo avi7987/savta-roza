@@ -2,9 +2,9 @@
 
 import "@xyflow/react/dist/style.css";
 import { MiniMap, ReactFlow, ReactFlowProvider, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Expand, Maximize2, Minus, Plus, RotateCcw, Search, X } from "lucide-react";
+import { Check, Expand, Layers, Maximize2, Minus, Plus, RotateCcw, Search, X } from "lucide-react";
 import { ROSA } from "@/content/family";
 import { chainToRosa } from "@/lib/family";
 import { layoutFamily, type FamilyLayout } from "@/lib/familyLayout";
@@ -27,15 +27,21 @@ export function immediateFamily(fam: Fam, id: string) {
 
 /** a card just let out of a folded branch: where the pile was, relative to it, and when its turn comes */
 type Appear = { dx: number; dy: number; delay: number };
-type PersonData = { id: string; state: CardState; onOpen: (id: string) => void; onAdd: (id: string) => void; fold?: { folded: boolean; hidden: number; toggle: () => void }; fam: Fam; appear?: Appear };
+type PersonData = { id: string; state: CardState; onOpen: (id: string) => void; onAdd: (id: string) => void; fold?: { folded: boolean; hidden: number; toggle: () => void }; fam: Fam; appear?: Appear; leave?: { dx: number; dy: number } };
 type LinesData = { layout: FamilyLayout; lit: Set<string> | null; path: string[]; fam: Fam; labels: { y: number; text: string }[]; rtl: boolean; selected: string | null };
 
 const PersonNode = memo(function PersonNode({ data }: NodeProps<Node<PersonData>>) {
   const { fam, id } = data;
   const p = fam.graph.byId.get(id)!;
   const a = data.appear;
+  const l = data.leave;
+  // coming out of the card above it, or (when a generation is put away) drawn back into it
   return (
-    <div dir="auto" className={a ? "card-pop" : undefined} style={a ? ({ "--dx": `${a.dx}px`, "--dy": `${a.dy}px`, animationDelay: `${a.delay}ms` } as CSSProperties) : undefined}>
+    <div
+      dir="auto"
+      className={l ? "card-fold" : a ? "card-pop" : undefined}
+      style={l ? ({ "--dx": `${l.dx}px`, "--dy": `${l.dy}px` } as CSSProperties) : a ? ({ "--dx": `${a.dx}px`, "--dy": `${a.dy}px`, animationDelay: `${a.delay}ms` } as CSSProperties) : undefined}
+    >
       <PersonCard person={p} name={fam.nameOf(id)} relation={fam.relLabel(id)} state={data.state} onOpen={() => data.onOpen(id)} onAdd={p.placeholder ? undefined : () => data.onAdd(id)} fold={data.fold} />
     </div>
   );
@@ -116,6 +122,19 @@ const LinesNode = memo(function LinesNode({ data }: NodeProps<Node<LinesData>>) 
   );
 });
 
+/** the nearest of this person's forebears (parents, then theirs) that is in the set */
+function ancestorIn(g: Fam["graph"], id: string, set: Set<string>) {
+  const seen = new Set<string>();
+  let row = g.parentsOf(id);
+  while (row.length) {
+    const hit = row.find((x) => set.has(x));
+    if (hit) return hit;
+    row.forEach((x) => seen.add(x));
+    row = row.flatMap((x) => g.parentsOf(x)).filter((x) => !seen.has(x));
+  }
+  return undefined;
+}
+
 const nodeTypes = { person: PersonNode, lines: LinesNode };
 
 type Props = { fam: Fam; onOpen: (id: string) => void; onAdd: (id: string) => void; phone?: boolean };
@@ -162,17 +181,95 @@ function Board({ fam, onOpen, onAdd, phone = false }: Props) {
     } else next.add(id);
     return next;
   }), []);
+  /* ---------- how many generations to show ---------- */
+
+  // every generation in the family, below Rosa's; showing "up to the grandchildren" folds the grandchildren's branches
+  const levels = useMemo(() => {
+    const lv = fam.graph.levels();
+    return { of: lv, all: [...new Set(fam.graph.people.filter((p) => !p.virtual).map((p) => lv.get(p.id) ?? 0))].sort((a, b) => a - b) };
+  }, [fam.graph]);
+  const depths = levels.all.filter((l) => l >= 1 && l < Math.max(...levels.all));
+  const [depth, setDepth] = useState<number | null>(null);
+  const [depthOpen, setDepthOpen] = useState(false);
+  const [leaving, setLeaving] = useState<Map<string, { dx: number; dy: number }>>(new Map());
+  const refit = useRef(false);
+  const reduce = useReducedMotion();
+  const foldsAt = useCallback(
+    (l: number | null) => new Set(l === null ? [] : fam.graph.people.filter((p) => !p.virtual && levels.of.get(p.id) === l && fam.graph.childrenOf(p.id).length > 0).map((p) => p.id)),
+    [fam.graph, levels]
+  );
+  const chooseDepth = useCallback(
+    (l: number | null) => {
+      setDepthOpen(false);
+      setDepth(l);
+      try {
+        localStorage.setItem("roza-tree-depth", l === null ? "" : String(l));
+      } catch {}
+      const next = foldsAt(l);
+      // the cards that go: each is drawn back up into the nearest card that stays, then the tree closes up
+      const keep = new Set(layoutFamily(fam.graph, { ...LAYOUT, rtl: dir === "rtl", collapsed: next }).cards.map((c) => c.id));
+      const going = layout.cards.filter((c) => !keep.has(c.id));
+      refit.current = true;
+      if (!going.length || reduce) return setCollapsed(next);
+      const pos = new Map(layout.cards.map((c) => [c.id, c]));
+      setLeaving(
+        new Map(
+          going.map((c) => {
+            const a = pos.get(ancestorIn(fam.graph, c.id, keep) ?? "");
+            return [c.id, a ? { dx: a.x - c.x, dy: a.y - c.y } : { dx: 0, dy: -60 }];
+          })
+        )
+      );
+      setTimeout(() => {
+        setLeaving(new Map());
+        setCollapsed(next);
+      }, 430);
+    },
+    [foldsAt, fam.graph, dir, layout, reduce]
+  );
+  // a choice made on an earlier visit
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || !fam.loaded || !levels.all.length) return;
+    restored.current = true;
+    let v: string | null = null;
+    try {
+      v = localStorage.getItem("roza-tree-depth");
+    } catch {}
+    const l = v ? Number(v) : NaN;
+    if (Number.isInteger(l) && depths.includes(l)) {
+      setDepth(l);
+      setCollapsed(foldsAt(l));
+    }
+  }, [fam.loaded, levels, depths, foldsAt]);
+  // once the cards have moved into their new places, the view grows (or shrinks) to the new tree
+  useEffect(() => {
+    if (!refit.current) return;
+    refit.current = false;
+    const id = setTimeout(() => flow.fitView({ padding: 0.12, duration: 700, maxZoom: 1 }), 380);
+    return () => clearTimeout(id);
+  }, [layout, flow]);
+
   const shownBefore = useRef<Set<string>>(new Set());
   const appear = useMemo(() => {
     const out = new Map<string, Appear>();
-    const from = unfolding.current ? layout.cards.find((c) => c.id === unfolding.current) : undefined;
-    if (!from) return out;
-    const fresh = layout.cards.filter((c) => !shownBefore.current.has(c.id));
+    const shown = shownBefore.current;
+    if (!shown.size) return out; // the first drawing of the tree comes in on its own
+    const pos = new Map(layout.cards.map((c) => [c.id, c]));
+    // each new card comes out of the card it hangs from: the branch opened, or the nearest one already there
+    const fromOf = (id: string) => {
+      if (unfolding.current) return pos.get(unfolding.current);
+      const a = ancestorIn(fam.graph, id, shown);
+      return a ? pos.get(a) : undefined;
+    };
+    const fresh = layout.cards.filter((c) => !shown.has(c.id));
     fresh
-      .sort((a, b) => a.level - b.level || Math.abs(a.x - from.x) - Math.abs(b.x - from.x))
-      .forEach((c, i) => out.set(c.id, { dx: from.x - c.x, dy: from.y - c.y, delay: 120 + Math.min(i, 12) * 70 }));
+      .map((c) => ({ c, from: fromOf(c.id) }))
+      .filter((x): x is { c: (typeof fresh)[number]; from: NonNullable<ReturnType<typeof fromOf>> } => !!x.from)
+      .sort((a, b) => a.c.level - b.c.level || Math.abs(a.c.x - a.from.x) - Math.abs(b.c.x - b.from.x))
+      .forEach(({ c, from }, i) => out.set(c.id, { dx: from.x - c.x, dy: from.y - c.y, delay: 120 + Math.min(i, 16) * 45 }));
     return out;
-  }, [layout]);
+  }, [layout, fam.graph]);
   useEffect(() => {
     shownBefore.current = new Set(layout.cards.map((c) => c.id));
     unfolding.current = null;
@@ -206,11 +303,12 @@ function Board({ fam, onOpen, onAdd, phone = false }: Props) {
           onAdd,
           fold: hasKids && c.id !== ROSA ? { folded: collapsed.has(c.id), hidden: c.hidden, toggle: () => toggle(c.id) } : undefined,
           appear: appear.get(c.id),
+          leave: leaving.get(c.id),
         } satisfies PersonData,
       });
     }
     return list;
-  }, [layout, lit, path, labels, dir, fam, selected, open, onAdd, collapsed, toggle, appear]);
+  }, [layout, lit, path, labels, dir, fam, selected, open, onAdd, collapsed, toggle, appear, leaving]);
 
   const centerOn = useCallback(
     (id: string, zoom?: number) => {
@@ -347,6 +445,43 @@ function Board({ fam, onOpen, onAdd, phone = false }: Props) {
             {full ? null : m.full}
           </button>
         )}
+        {depths.length > 0 && (
+          <div className="pointer-events-auto relative">
+            <button
+              type="button"
+              onClick={() => setDepthOpen((o) => !o)}
+              aria-expanded={depthOpen}
+              aria-haspopup="menu"
+              className="flex h-11 items-center gap-1.5 whitespace-nowrap rounded-full bg-white/95 px-3.5 text-[0.88rem] text-burgundy shadow-[var(--shadow-paper)] ring-1 ring-line"
+            >
+              <Layers className="h-4 w-4" aria-hidden />
+              {depth === null ? m.depthAll : m.depthUpTo(m.gen(depth))}
+            </button>
+            <AnimatePresence>
+              {depthOpen && (
+                <motion.ul
+                  role="menu"
+                  initial={{ opacity: 0, y: -6, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                  transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                  className="absolute end-0 top-full z-20 mt-1.5 min-w-[13rem] rounded-xl bg-white p-1 shadow-[0_12px_28px_-8px_rgba(60,40,30,0.3)] ring-1 ring-charcoal/10"
+                  onKeyDown={(e) => e.key === "Escape" && setDepthOpen(false)}
+                >
+                  <li className="px-3 pb-1 pt-2 text-[0.78rem] text-ink-soft">{m.depthTitle}</li>
+                  {[null, ...[...depths].reverse()].map((l) => (
+                    <li key={l ?? "all"} role="none">
+                      <button type="button" role="menuitemradio" aria-checked={depth === l} onClick={() => chooseDepth(l)} className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-start text-[0.92rem] hover:bg-blush/30">
+                        <Check className={cn("h-4 w-4 shrink-0 text-rose", depth !== l && "invisible")} aria-hidden />
+                        {l === null ? m.depthAll : m.depthUpTo(m.gen(l))}
+                      </button>
+                    </li>
+                  ))}
+                </motion.ul>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
         {layout.rows.length > 1 && (!phone || full) && (
           <div role="group" aria-label={m.generations} className={cn("pointer-events-auto flex max-w-full gap-1 overflow-x-auto rounded-full bg-white/95 p-1 shadow-[var(--shadow-paper)] ring-1 ring-line [scrollbar-width:none]", phone && "w-fit")}>
             {layout.rows.map((r) => (
@@ -385,6 +520,7 @@ function Board({ fam, onOpen, onAdd, phone = false }: Props) {
           onClick={() => {
             setSelected(null);
             setCollapsed(new Set());
+            setDepth(null);
             setTimeout(() => centerOn(ROSA, 0.9), 50);
           }}
           className="flex h-10 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[0.88rem] text-burgundy hover:bg-blush/40"
