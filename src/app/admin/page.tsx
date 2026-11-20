@@ -1,6 +1,7 @@
 "use client";
 
 import StoragePanel from "./StoragePanel";
+import SiteSwitch from "./SiteSwitch";
 import PasswordPanel from "./PasswordPanel";
 import Tools from "./tools/Tools";
 import { AnimatePresence, motion } from "motion/react";
@@ -431,6 +432,7 @@ export default function AdminPage() {
 
   return (
     <div dir="rtl" lang="he" className="min-h-screen bg-ivory">
+      <SiteSwitch />
       <header className="border-b border-line bg-paper/80">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-4">
           <span className="flex items-center gap-2.5 text-burgundy">
