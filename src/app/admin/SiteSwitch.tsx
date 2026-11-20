@@ -4,12 +4,12 @@
   same file is in both projects; only HERE differs.)
 */
 
-const SITES = [
+type Site = { id: "roza" | "lonya"; name: string; admin: string };
+const SITES: Site[] = [
   { id: "roza", name: "סבתא רוזה", admin: "https://savta-roza-1.avi7987.workers.dev/admin" },
-  // filled in once the new site has its address on Cloudflare
-  { id: "lonya", name: "סבא לוניה", admin: "" },
-] as const;
-const HERE: (typeof SITES)[number]["id"] = "roza";
+  { id: "lonya", name: "סבא לוניה", admin: "https://saba-lonya.ayaokshus.workers.dev/admin" },
+];
+const HERE: Site["id"] = "roza";
 
 export default function SiteSwitch() {
   return (
