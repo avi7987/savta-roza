@@ -1,7 +1,7 @@
 "use client";
 
 import StoragePanel from "./StoragePanel";
-import SiteSwitch from "./SiteSwitch";
+import SiteSwitch, { takeHandedSignIn } from "./SiteSwitch";
 import PasswordPanel from "./PasswordPanel";
 import Tools from "./tools/Tools";
 import { AnimatePresence, motion } from "motion/react";
@@ -309,7 +309,7 @@ export default function AdminPage() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState("");
 
-  const load = useCallback(async (tk: string) => {
+  const load = useCallback(async (tk: string, handed = false) => {
     setError("");
     setBusy(true);
     try {
@@ -317,7 +317,8 @@ export default function AdminPage() {
       const [m, f] = await Promise.all([get("memories"), get("family")]);
       if (m.status === 401 || m.status === 429) {
         setAuthed(false);
-        setError(m.status === 429 ? "היו כאן יותר מדי ניסיונות שגויים, אז הכניסה ננעלה לרבע שעה. נסו שוב אחר כך, עם הסיסמה המדויקת." : "הסיסמה לא נכונה. כדאי להעתיק ולהדביק אותה במקום להקליד. אחרי 10 ניסיונות שגויים הכניסה ננעלת לרבע שעה.");
+        setError(m.status === 429 ? "היו כאן יותר מדי ניסיונות שגויים, אז הכניסה ננעלה לרבע שעה. נסו שוב אחר כך, עם הסיסמה המדויקת." : handed ? "לאתר הזה יש סיסמה אחרת. היכנסו כאן עם הסיסמה שלו (אפשר אחר כך לבחור לשני האתרים אותה סיסמה, ואז המעבר לא יבקש שוב)." : "הסיסמה לא נכונה. כדאי להעתיק ולהדביק אותה במקום להקליד. אחרי 10 ניסיונות שגויים הכניסה ננעלת לרבע שעה.");
+        if (handed) setToken("");
         try {
           sessionStorage.removeItem("roza-admin");
         } catch {}
@@ -337,10 +338,11 @@ export default function AdminPage() {
 
   useEffect(() => {
     try {
-      const saved = sessionStorage.getItem("roza-admin");
+      const handed = takeHandedSignIn();
+      const saved = handed || sessionStorage.getItem("roza-admin");
       if (saved) {
         setToken(saved);
-        load(saved);
+        load(saved, !!handed);
       }
     } catch {}
   }, [load]);
