@@ -20,7 +20,7 @@ const base64 = (b: Uint8Array) => {
   return btoa(s);
 };
 
-export type Estimate = { date: PhotoDate; reproduction: boolean; category?: CategoryId };
+export type Estimate = { date: PhotoDate; reproduction: boolean; category?: CategoryId; faces?: number };
 
 export async function estimatePhoto(jpeg: Uint8Array, opts: { rosaInPhoto?: boolean } = {}): Promise<Estimate | null> {
   const ai = await binding();
@@ -36,7 +36,7 @@ If the picture is a reproduction of an old printed photo (a scan, or a phone pho
 ${rosa}
 Pick a "category" from: ${CATEGORIES.join(", ")} (family gatherings = family, a young child = childhood, holidays/weddings/birthdays = celebrations, outdoors/trips = travel, grandchildren with an older woman = grandchildren, otherwise moments).
 Reply with ONLY a JSON object, no other text:
-{"year_from": <int>, "year_to": <int>, "best_year": <int>, "reproduction": <true|false>, "rosa_age": <int|null>, "category": "<category>", "clues_he": "<one short Hebrew sentence with the main clues>"}`;
+{"people": <how many people can be seen, 0 if none>, "year_from": <int>, "year_to": <int>, "best_year": <int>, "reproduction": <true|false>, "rosa_age": <int|null>, "category": "<category>", "clues_he": "<one short Hebrew sentence with the main clues>"}`;
 
   try {
     const res = (await ai.run(MODEL, {
@@ -74,7 +74,9 @@ Reply with ONLY a JSON object, no other text:
     const date = cleanDate({ from, to, clues: typeof o.clues_he === "string" ? o.clues_he : undefined }, "ai");
     if (!date) return null;
     const category = CATEGORIES.includes(o.category as CategoryId) ? (o.category as CategoryId) : undefined;
-    return { date, reproduction: o.reproduction === true, category };
+    const n = Number(o.people);
+    const faces = Number.isInteger(n) && n >= 0 && n < 100 ? n : undefined;
+    return { date, reproduction: o.reproduction === true, category, faces };
   } catch (e) {
     console.warn("[vision] estimate failed", e);
     return null;

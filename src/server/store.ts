@@ -33,6 +33,8 @@ export type StoredFile = {
   deleteRequest?: DeleteRequest;
   /** last time the date estimate was tried (so it is retried later, not on every visit) */
   aiTriedAt?: string;
+  /** how many people the photo shows, as the computer counted them (0: a place or a thing) */
+  faces?: number;
   /** family members tagged in this photo (ids in the family tree) */
   people?: string[];
   /** what family members told us about this photo ("tell us more") */

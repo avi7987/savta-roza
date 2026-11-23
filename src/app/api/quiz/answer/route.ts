@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { rateLimited } from "@/server/auth";
-import { dropOpen } from "@/server/quiz";
+import { dropOpen, markAnswered } from "@/server/quiz";
 import { factStore } from "@/server/store";
 
 export const runtime = "nodejs";
@@ -23,6 +23,7 @@ export async function POST(req: Request) {
   // answered with a recording (saved as a memory of its own): the question is only marked as answered
   if (b.recorded === true) {
     if (id.startsWith("a-")) await dropOpen(id);
+    await markAnswered(id);
     return json({ ok: true });
   }
   let statement = clean(b.answer, 600);
@@ -47,5 +48,6 @@ export async function POST(req: Request) {
     "pending"
   );
   if (id.startsWith("a-")) await dropOpen(id);
+  await markAnswered(id);
   return json({ ok: true });
 }

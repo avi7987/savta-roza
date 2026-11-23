@@ -44,7 +44,7 @@ export async function analyzeMemory(id: string, opts: { only?: string; force?: b
       if (!est) return { ...f, aiTriedAt: tried };
       const user = opts.force ? undefined : f.date?.source === "user" ? f.date : undefined;
       const exif = f.date?.source === "exif" ? f.date : undefined;
-      return { ...f, aiTriedAt: tried, date: chooseDate(user, exif, est) ?? f.date, category: f.category ?? est?.category };
+      return { ...f, aiTriedAt: tried, faces: est.faces ?? f.faces, date: chooseDate(user, exif, est) ?? f.date, category: f.category ?? est?.category };
     }),
   }));
 }
