@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { quizCards, quizOn } from "@/server/quiz";
+import { later } from "@/server/analyze";
+import { checkKnown, openQuestions, ownQuestions, quizCards, quizOn } from "@/server/quiz";
 
 export const runtime = "nodejs";
 
@@ -7,5 +8,8 @@ export const runtime = "nodejs";
 export async function GET(req: Request) {
   const want = new URL(req.url).searchParams.get("q")?.slice(0, 200) || undefined;
   const on = await quizOn();
-  return NextResponse.json({ on, cards: on ? await quizCards(want) : [] }, { headers: { "Cache-Control": "no-store" } });
+  const cards = on ? await quizCards(want) : [];
+  // in the background: which questions the verified facts already answer (a few at a time, kept until the facts change)
+  if (on) await later(checkKnown([...(await openQuestions()).map((x) => x.q), ...(await ownQuestions())]).catch(() => {}));
+  return NextResponse.json({ on, cards }, { headers: { "Cache-Control": "no-store" } });
 }

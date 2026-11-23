@@ -2,6 +2,8 @@ import "server-only";
 import { ROSA } from "@/content/family";
 import { sortYear } from "@/lib/photoDate";
 import { factStore, store } from "./store";
+import { chat, parseJson } from "./ai";
+import { nearest } from "./semantic";
 import { treeState } from "./treeEdit";
 
 /*
@@ -20,6 +22,7 @@ const OPEN = "quiz-open";
 const OWN = "quiz-questions";
 const OFF = "quiz-off";
 const DONE = "quiz-answered";
+const WHO_NAME = "grandmother Rosa";
 const MAX_OPEN = 40;
 
 /** what she would ask if the owner has not written questions of their own */
@@ -114,6 +117,66 @@ export async function markAnswered(id: string) {
   await store.setMeta(DONE, JSON.stringify([...done].slice(-2000)));
 }
 
+/*
+  Does the site already know the answer? A question is checked against the verified facts closest
+  to it in meaning, and a model says whether one of them answers it. The result is kept until the
+  verified facts change, so it is worked out once (in the background), not on every visit.
+*/
+const KNOWN = "quiz-known";
+type KnownCache = { v: string; q: Record<string, boolean> };
+async function knownCache(): Promise<KnownCache> {
+  try {
+    const c = JSON.parse((await store.getMeta(KNOWN)) ?? "null") as KnownCache | null;
+    return c && typeof c.v === "string" && c.q ? c : { v: "", q: {} };
+  } catch {
+    return { v: "", q: {} };
+  }
+}
+async function factsVersion() {
+  const ids = (await factStore.list("approved")).map((f) => f.id + (f.reviewedAt ?? "")).sort();
+  return hashId(ids.join("|"));
+}
+
+/** the questions (by text) that a verified fact already answers, as far as worked out so far */
+export async function knownAnswers(): Promise<Set<string>> {
+  const c = await knownCache();
+  if (c.v !== (await factsVersion())) return new Set();
+  return new Set(Object.entries(c.q).filter(([, k]) => k).map(([q]) => q));
+}
+
+/** work out, for up to `limit` questions not checked yet, whether a verified fact answers them */
+export async function checkKnown(questions: string[], limit = 4) {
+  const v = await factsVersion();
+  const c = await knownCache();
+  const cache: KnownCache = c.v === v ? c : { v, q: {} };
+  let n = 0;
+  for (const q of questions) {
+    if (q in cache.q || n >= limit) continue;
+    n++;
+    const hits = ((await nearest(q, 4, 0.45)) ?? []).filter((h) => h.kind === "fact");
+    if (!hits.length) {
+      cache.q[q] = false;
+      continue;
+    }
+    const answer = await chat(
+      "background",
+      [
+        {
+          role: "system",
+          content: `A family memorial site about ${WHO_NAME} asks visitors questions it does not know the answer to yet. Decide whether the verified facts below already answer the question (fully, the main thing it asks: a year asked needs the year). Reply with ONLY JSON: {"answered": true|false}`,
+        },
+        { role: "user", content: `Question: ${q}\n\nVerified facts:\n${hits.map((h) => `- ${h.text}`).join("\n")}` },
+      ],
+      { maxTokens: 60, temperature: 0 }
+    );
+    if (answer === null) break; // the day's allowance: the rest waits for a later visit
+    cache.q[q] = parseJson<{ answered?: boolean }>(answer)?.answered === true;
+    // a question someone asked that the site can now answer is no longer kept as open
+    if (cache.q[q]) await dropOpen(q).catch(() => {});
+  }
+  await store.setMeta(KNOWN, JSON.stringify(cache));
+}
+
 /** once someone answered it (or the owner removed it), it is no longer asked */
 export async function dropOpen(idOrText: string) {
   const list = await openQuestions();
@@ -157,8 +220,9 @@ export async function quizCards(want?: string): Promise<QuizCard[]> {
     .filter(({ m, f }) => !done.has(`pp-${m.id}-${f.name}`))
     .map(({ m, f }) => ({ id: `pp-${m.id}-${f.name}`, kind: "photo-who", src: src(m, f), memoryId: m.id, file: f.name, year: sortYear(f.date) }));
 
-  const asked: QuizCard[] = (await openQuestions()).filter((x) => !told.has(norm(x.q))).map((x) => ({ id: `a-${hashId(x.q)}`, kind: "fact", text: x.q, from: "asked" }));
-  const own: QuizCard[] = shuffle((await ownQuestions()).filter((q) => !done.has(`o-${hashId(q)}`) && !told.has(norm(q)))).map((q) => {
+  const knows = await knownAnswers();
+  const asked: QuizCard[] = (await openQuestions()).filter((x) => !told.has(norm(x.q)) && !knows.has(x.q)).map((x) => ({ id: `a-${hashId(x.q)}`, kind: "fact", text: x.q, from: "asked" }));
+  const own: QuizCard[] = shuffle((await ownQuestions()).filter((q) => !done.has(`o-${hashId(q)}`) && !told.has(norm(q)) && !knows.has(q))).map((q) => {
     const d = DEFAULT_QUESTIONS.indexOf(q);
     return { id: `o-${hashId(q)}`, kind: "fact", text: q, textRu: d >= 0 ? DEFAULT_RU[d] : undefined, from: "owner" };
   });
