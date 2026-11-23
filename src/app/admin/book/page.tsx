@@ -178,7 +178,7 @@ export default function BookPage() {
             <div className="flex min-h-[250mm] flex-col items-center justify-center gap-6 text-center print:min-h-[255mm]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/images/rosa-portrait.webp" alt="" className="w-[95mm] max-w-full" />
-              <h1 className="font-display text-[44pt] font-light leading-none text-burgundy">סבתא רוזה</h1>
+              <h1 className="font-display text-[44pt] font-medium leading-none text-burgundy">סבתא רוזה</h1>
               <p className="text-[15pt] text-ink-soft">ספר הזיכרונות של המשפחה</p>
               <p className="mt-10 text-[10pt] text-ink-soft">{today}</p>
             </div>
@@ -278,7 +278,7 @@ export default function BookPage() {
         {parts.end && (
           <Sheet>
             <div className="flex min-h-[230mm] flex-col items-center justify-center gap-4 text-center">
-              <p className="font-display text-[22pt] font-light text-burgundy">הספר הזה נאסף על ידי כל המשפחה</p>
+              <p className="font-display text-[22pt] font-medium text-burgundy">הספר הזה נאסף על ידי כל המשפחה</p>
               <p className="max-w-[120mm] text-[11pt] leading-relaxed text-ink-soft">והוא ממשיך לגדול. עוד תמונות, סיפורים והקלטות שלה נמצאים באתר, וכל אחד יכול להוסיף.</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {qr && <img src={qr} alt="" className="mt-4 h-[45mm] w-[45mm]" />}
@@ -302,7 +302,7 @@ function Title({ children }: { children: React.ReactNode }) {
   return (
     <div className="keep flex flex-col items-center gap-2 pb-2 text-center">
       <span aria-hidden className="text-[16pt] text-rose">❦</span>
-      <h2 className="font-display text-[26pt] font-light text-burgundy">{children}</h2>
+      <h2 className="font-display text-[26pt] font-medium text-burgundy">{children}</h2>
     </div>
   );
 }

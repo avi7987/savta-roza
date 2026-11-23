@@ -27,7 +27,7 @@ export default function Footer() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 1.2, ease, delay: 0.6 }}
-          className="mt-8 font-display text-[clamp(2.6rem,6vw,5rem)] font-light leading-tight text-burgundy"
+          className="mt-8 font-display text-[clamp(2.6rem,6vw,5rem)] font-medium leading-tight text-burgundy"
         >
           {l(profile.closing)}
         </motion.p>

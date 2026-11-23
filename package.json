@@ -11,6 +11,7 @@
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
+    "@fontsource-variable/rubik": "^5.3.0",
     "@fontsource/caveat": "^5.3.0",
     "@fontsource/cormorant-garamond": "^5.3.0",
     "@fontsource/frank-ruhl-libre": "^5.3.0",

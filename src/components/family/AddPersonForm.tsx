@@ -153,7 +153,7 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
     if (step === 0)
       return (
         <div className="flex flex-col gap-4">
-          <h3 className="font-display text-[1.6rem] font-light text-burgundy">{w.whoQ}</h3>
+          <h3 className="font-display text-[1.6rem] font-medium text-burgundy">{w.whoQ}</h3>
           <div className="relative">
             <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" aria-hidden />
             <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={w.whoHint} aria-label={w.whoQ} className={cn(input, "ps-9")} />
@@ -178,7 +178,7 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
     if (step === 1)
       return (
         <div className="flex flex-col gap-4">
-          <h3 className="font-display text-[1.6rem] font-light text-burgundy">{w.relQ(ofName)}</h3>
+          <h3 className="font-display text-[1.6rem] font-medium text-burgundy">{w.relQ(ofName)}</h3>
           <div className="grid gap-2 sm:grid-cols-2">
             {RELS.map(({ id, Icon }) => {
               const off = id === "parent" && parentFull;
@@ -289,7 +289,7 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
     if (step === 3)
       return (
         <div className="flex flex-col items-center gap-4 text-center">
-          <h3 className="font-display text-[1.6rem] font-light text-burgundy">{w.photoQ}</h3>
+          <h3 className="font-display text-[1.6rem] font-medium text-burgundy">{w.photoQ}</h3>
           <label className="flex cursor-pointer flex-col items-center gap-3">
             {preview ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -320,7 +320,7 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
     const draft = { id: "draft", name, nameAlt: v.nameAlt, gender: v.gender, born: v.born, died: gone ? v.died || "?" : "", photoSrc: preview || existing?.photoSrc, pending: true };
     return (
       <div className="flex flex-col gap-5">
-        <h3 className="font-display text-[1.6rem] font-light text-burgundy">{w.review}</h3>
+        <h3 className="font-display text-[1.6rem] font-medium text-burgundy">{w.review}</h3>
         <div className="flex flex-wrap items-center justify-center gap-3 rounded-[16px] bg-[#fbf7f2] p-4 ring-1 ring-line">
           <PersonCard person={draft} name={name} relation={editing ? fam.relLabel(editing) : undefined} onOpen={() => setStep(2)} />
           {!editing && of && (
@@ -361,7 +361,7 @@ export default function AddPersonForm({ fam, preset, onClose }: { fam: Fam; pres
         lang={lang}
       >
         <div className="flex items-center justify-between px-6 pb-2 pt-4 sm:px-8">
-          <h2 id={`${uid}-title`} className="flex items-center gap-3 font-display text-[1.5rem] font-light text-burgundy">
+          <h2 id={`${uid}-title`} className="flex items-center gap-3 font-display text-[1.5rem] font-medium text-burgundy">
             <RoseBud className="h-8 w-6" still />
             {editing ? t.family.edit : f.title}
           </h2>

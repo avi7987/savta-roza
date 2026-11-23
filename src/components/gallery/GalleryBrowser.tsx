@@ -131,7 +131,7 @@ function Browser() {
         <Container wide className="pb-36 pt-8 sm:pt-12">
           <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 text-center">
             <RoseBud className="h-10 w-7" still />
-            <h1 className="font-display text-[clamp(2.1rem,5vw,3.6rem)] font-light leading-tight text-burgundy">{t.album.coverTitle}</h1>
+            <h1 className="font-display text-[clamp(2.1rem,5vw,3.6rem)] font-medium leading-tight text-burgundy">{t.album.coverTitle}</h1>
             <p className="font-hand text-[1.05rem] leading-relaxed text-ink-soft sm:text-[1.15rem]">{t.album.coverLead}</p>
             {counts.all > 0 && KINDS.filter((k) => k !== "all" && counts[k] > 0).length > 1 && (
               <Segmented className="mt-3" label={t.album.type} value={kind} onChange={setKind} options={KINDS.filter((k) => k === "all" || counts[k] > 0).map((k) => ({ id: k, label: t.album.kinds[k] }))} />

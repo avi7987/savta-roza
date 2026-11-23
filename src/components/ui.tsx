@@ -52,7 +52,7 @@ export function SectionIntro({
           <Item as="span" className="block">
             <Eyebrow>{eyebrow}</Eyebrow>
           </Item>
-          <Item as="h2" rise className="mt-4 text-[clamp(2.4rem,5.2vw,4.5rem)] font-light leading-[1.05] text-burgundy">
+          <Item as="h2" rise className="mt-4 text-[clamp(2.4rem,5.2vw,4.5rem)] font-medium leading-[1.05] text-burgundy">
             <span id={id}>{title}</span>
           </Item>
         </div>
@@ -70,7 +70,7 @@ export function SectionIntro({
       <Item as="span">
         <Eyebrow>{eyebrow}</Eyebrow>
       </Item>
-      <Item as="h2" rise className="text-[clamp(2.4rem,5.2vw,4.5rem)] font-light leading-[1.05] text-burgundy">
+      <Item as="h2" rise className="text-[clamp(2.4rem,5.2vw,4.5rem)] font-medium leading-[1.05] text-burgundy">
         <span id={id}>{title}</span>
       </Item>
       {lead && (

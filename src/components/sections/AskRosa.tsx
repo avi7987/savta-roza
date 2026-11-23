@@ -116,7 +116,7 @@ export default function AskRosa() {
           {s.askEyebrow}
         </motion.span>
         <p className="-mb-3 font-hand text-[clamp(1.25rem,2.4vw,1.6rem)] text-burgundy/90">{s.askHello}</p>
-        <motion.h2 id="ask-title" initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, ease, delay: 0.05 }} className="max-w-3xl text-[clamp(2.1rem,4.6vw,3.6rem)] font-light leading-[1.1] text-burgundy">
+        <motion.h2 id="ask-title" initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, ease, delay: 0.05 }} className="max-w-3xl text-[clamp(2.1rem,4.6vw,3.6rem)] font-medium leading-[1.1] text-burgundy">
           {s.askTitle}
         </motion.h2>
         <p className="max-w-xl text-[1rem] leading-relaxed text-ink-soft">{s.askLead}</p>

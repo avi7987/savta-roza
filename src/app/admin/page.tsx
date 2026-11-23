@@ -469,7 +469,7 @@ export default function AdminPage() {
       <main className="mx-auto max-w-4xl px-5 pb-24 pt-10">
         {!authed ? (
           <div className="mx-auto max-w-md rounded-lg bg-white p-8 shadow-[var(--shadow-paper)]">
-            <h1 className="font-display text-3xl font-light text-burgundy">כניסה לניהול</h1>
+            <h1 className="font-display text-3xl font-medium text-burgundy">כניסה לניהול</h1>
             <p className="mt-3 leading-relaxed text-ink-soft">כאן מטפלים בבקשות הסרה, מאשרים אנשים לעץ המשפחה וכותבים מילים לסיפור החיים.</p>
             <form
               className="mt-6 flex flex-col gap-3"
@@ -489,7 +489,7 @@ export default function AdminPage() {
         ) : (
           <>
             <section className="rounded-lg bg-white p-6 shadow-[var(--shadow-paper)]">
-              <h1 className="font-display text-3xl font-light text-burgundy">שלום! כך זה עובד</h1>
+              <h1 className="font-display text-3xl font-medium text-burgundy">שלום! כך זה עובד</h1>
               <ol className="mt-4 grid gap-3 text-[0.98rem] leading-relaxed text-charcoal sm:grid-cols-3">
                 <li className="rounded-md bg-blush/30 p-4">
                   <b className="block text-burgundy">1. כל המשפחה מעלה</b>

@@ -82,7 +82,7 @@ export default function MemoriesView() {
       <Container className="py-12 md:py-20">
         <header className="flex max-w-3xl flex-col items-start gap-4">
           <Eyebrow>{t.memories.eyebrow}</Eyebrow>
-          <motion.h1 initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} className="font-display text-[clamp(2.4rem,5.2vw,4rem)] font-light leading-[1.05] text-burgundy">
+          <motion.h1 initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }} className="font-display text-[clamp(2.4rem,5.2vw,4rem)] font-medium leading-[1.05] text-burgundy">
             {p.title}
           </motion.h1>
           <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.08, ease: [0.22, 1, 0.36, 1] }} className="max-w-xl text-lg leading-relaxed text-ink-soft">

@@ -433,7 +433,7 @@ export default function AddMemoryWizard() {
     return (
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease }} className="flex flex-col items-center gap-5 py-10 text-center" role="status">
         <RoseTop className="h-24 w-24" />
-        <h2 className="font-display text-[clamp(2rem,4vw,2.8rem)] font-light text-burgundy">{type === "info" ? s.doneInfoTitle : s.doneTitle}</h2>
+        <h2 className="font-display text-[clamp(2rem,4vw,2.8rem)] font-medium text-burgundy">{type === "info" ? s.doneInfoTitle : s.doneTitle}</h2>
         <p className="max-w-md text-lg text-ink-soft">{type === "info" ? s.doneInfo : type === "words" ? s.doneWords : s.doneLead}</p>
         {STATIC && <p className="max-w-md text-[0.88rem] text-rose">{s.demoNote}</p>}
         {skipped > 0 && <p className="max-w-md text-[0.92rem] text-ink-soft">{s.skipped(skipped)}</p>}
@@ -593,7 +593,7 @@ export default function AddMemoryWizard() {
 
   const heading = (title: string, lead?: string) => (
     <div className="flex flex-col gap-2">
-      <h2 ref={headRef} tabIndex={-1} className="font-display text-[clamp(1.7rem,3.4vw,2.3rem)] font-light leading-tight text-burgundy outline-none">
+      <h2 ref={headRef} tabIndex={-1} className="font-display text-[clamp(1.7rem,3.4vw,2.3rem)] font-medium leading-tight text-burgundy outline-none">
         {title}
       </h2>
       {lead && <p className="text-[1.02rem] leading-relaxed text-ink-soft">{lead}</p>}

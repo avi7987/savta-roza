@@ -34,7 +34,7 @@ export default function Hero() {
           </p>
           <h1
             id="hero-title"
-            className="hero-title mt-4 text-[clamp(3.6rem,9.5vw,8.5rem)] font-light leading-[0.95] text-burgundy"
+            className="hero-title mt-4 text-[clamp(3.6rem,9.5vw,8.5rem)] font-medium leading-[0.95] text-burgundy"
           >
             {l(profile.name)}
           </h1>

@@ -203,7 +203,7 @@ export default function BulkUpload() {
   return (
     <div className="flex flex-col gap-7">
       <div className="flex flex-col gap-2">
-        <h2 className="font-display text-[clamp(1.7rem,3vw,2.2rem)] font-light text-burgundy">{b.title}</h2>
+        <h2 className="font-display text-[clamp(1.7rem,3vw,2.2rem)] font-medium text-burgundy">{b.title}</h2>
         <p className="text-[1.02rem] leading-relaxed text-ink-soft">{b.lead}</p>
       </div>
 

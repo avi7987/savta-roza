@@ -32,7 +32,7 @@ export default function ShareView({ bulk = false }: { bulk?: boolean }) {
               <RoseBud className="h-10 w-7" still />
               <span className="font-display text-xl">{l(profile.name)}</span>
             </Item>
-            <Item as="h1" className="text-[clamp(2.2rem,5.5vw,4.4rem)] font-light leading-[1.05] text-burgundy">
+            <Item as="h1" className="text-[clamp(2.2rem,5.5vw,4.4rem)] font-medium leading-[1.05] text-burgundy">
               {t.share.title}
             </Item>
             <Item as="p" className="hidden max-w-md text-lg leading-[1.85] text-ink-soft sm:block">

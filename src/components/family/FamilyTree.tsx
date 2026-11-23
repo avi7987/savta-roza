@@ -152,7 +152,7 @@ function PersonDrawer({ fam, id, onClose, onSwitch, onAdd }: { fam: Fam; id: str
         <div className="flex flex-col gap-8 px-7 pb-10">
           <header className="flex flex-col items-center gap-3 text-center">
             <PersonAvatar person={p} label={name} center={id === ROSA} className="w-28 text-2xl" />
-            <h3 className="font-display text-[2rem] font-light leading-tight text-burgundy">{name}</h3>
+            <h3 className="font-display text-[2rem] font-medium leading-tight text-burgundy">{name}</h3>
             {alt && <span className="-mt-2 text-ink-soft">{alt}</span>}
             <span className="text-[0.92rem] text-ink-soft">
               {!p.placeholder && id !== ROSA && cap(fam.relLabel(id))}

@@ -120,26 +120,26 @@ export default function Header() {
             <span className="font-display text-[1.35rem] leading-none">{l(profile.name)}</span>
           </TLink>
 
-          <nav aria-label={t.nav.menu} className="ms-auto hidden items-center gap-1 md:flex">
+          <nav aria-label={t.nav.menu} className="ms-auto hidden items-center gap-0.5 xl:flex 2xl:gap-1">
             {LINKS.map((link) => (
               <TLink
                 key={link.id}
                 href={link.href}
                 aria-current={navActive(link.id) ? "true" : undefined}
-                className={cn("relative px-3.5 py-3 text-[0.95rem] transition-colors", navActive(link.id) ? "text-burgundy" : "text-charcoal/75 hover:text-charcoal")}
+                className={cn("relative whitespace-nowrap px-2.5 py-3 text-[0.95rem] transition-colors 2xl:px-3.5", navActive(link.id) ? "text-burgundy" : "text-charcoal/75 hover:text-charcoal")}
               >
                 {t.nav[link.key]}
-                {navActive(link.id) && <motion.span layoutId="nav-u" className="absolute inset-x-3.5 bottom-2 h-px bg-burgundy" transition={{ duration: 0.5, ease }} />}
+                {navActive(link.id) && <motion.span layoutId="nav-u" className="absolute inset-x-2.5 bottom-2 h-px bg-burgundy 2xl:inset-x-3.5" transition={{ duration: 0.5, ease }} />}
               </TLink>
             ))}
           </nav>
 
-          <div className="ms-auto flex items-center gap-1 md:ms-4 sm:gap-2">
+          <div className="ms-auto flex items-center gap-1 xl:ms-4 sm:gap-2">
             <SearchButton />
             <LanguageSwitcher className="hidden sm:flex" />
             <TLink
               href="/share"
-              className="hidden min-h-11 items-center rounded-full border border-rose/40 px-5 text-[0.92rem] text-burgundy transition-colors hover:border-rose hover:bg-rose hover:text-white sm:inline-flex"
+              className="hidden min-h-11 items-center whitespace-nowrap rounded-full border border-rose/40 px-5 text-[0.92rem] text-burgundy transition-colors hover:border-rose hover:bg-rose hover:text-white sm:inline-flex xl:hidden 2xl:inline-flex"
             >
               {t.nav.share}
             </TLink>
@@ -150,7 +150,7 @@ export default function Header() {
               aria-label={t.nav.menu}
               aria-expanded={open}
               aria-controls="mobile-menu"
-              className="flex h-11 w-11 items-center justify-center text-burgundy md:hidden"
+              className="flex h-11 w-11 items-center justify-center text-burgundy xl:hidden"
             >
               <Menu className="h-6 w-6" strokeWidth={1.4} aria-hidden />
             </button>
@@ -186,7 +186,7 @@ export default function Header() {
               {LINKS.map((link, i) => (
                 <motion.div key={link.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.05, duration: 0.5, ease }}>
                   <TLink href={link.href} onClick={() => (release(), setOpen(false))} className="flex items-baseline gap-4 border-b border-line py-4">
-                    <span className="font-display text-[2.1rem] font-light leading-tight text-charcoal">{t.nav[link.key]}</span>
+                    <span className="font-display text-[2.1rem] font-medium leading-tight text-charcoal">{t.nav[link.key]}</span>
                   </TLink>
                 </motion.div>
               ))}

@@ -130,10 +130,10 @@ export default function AzkaraPanel() {
     const w = window.open("", "_blank");
     if (!w) return;
     w.document.write(`<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>סבתא רוזה · QR</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@300;400&family=Heebo:wght@400&display=swap" rel="stylesheet">
-<style>@page{size:A5;margin:14mm}body{margin:0;font-family:Heebo,Arial,sans-serif;color:#3b2a2f;text-align:center}
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500&display=swap" rel="stylesheet">
+<style>@page{size:A5;margin:14mm}body{margin:0;font-family:Rubik,Arial,sans-serif;color:#3b2a2f;text-align:center}
 .card{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 2px);gap:10px}
-h1{font-family:'Frank Ruhl Libre',serif;font-weight:300;font-size:34px;color:#762e49;margin:0}
+h1{font-family:Rubik,sans-serif;font-weight:500;font-size:34px;color:#762e49;margin:0}
 p{font-size:18px;margin:0;line-height:1.5}img{width:62mm;height:62mm;margin:8px 0}.u{font-size:13px;color:#8a6b74;direction:ltr}</style></head>
 <body><div class="card"><h1>יש לכם זיכרון מסבתא רוזה?</h1><p>תמונה, סיפור, מתכון או משפט שלה.<br>סרקו והוסיפו לאתר שלה.</p><img src="${qr}" alt=""><p class="u">${url}</p></div>
 <script>window.onload=()=>setTimeout(()=>window.print(),400)</script></body></html>`);

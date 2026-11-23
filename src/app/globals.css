@@ -6,10 +6,7 @@
   photographs mounted like an album, one botanical line drawing per chapter.
 */
 :root {
-  --font-frank: "Frank Ruhl Libre";
-  --font-cormorant: "Cormorant Garamond";
-  --font-heebo: "Heebo";
-  --font-roboto: "Roboto";
+  --font-rubik: "Rubik Variable";
   --font-playpen: "Playpen Sans Hebrew";
   --font-caveat: "Caveat";
 }
@@ -35,8 +32,8 @@
   --color-rail: #d3b9b6;
 
   /* typography: each Hebrew face is paired with a Cyrillic face of similar character */
-  --font-display: var(--font-frank), var(--font-cormorant), "Times New Roman", serif;
-  --font-sans: var(--font-heebo), var(--font-roboto), system-ui, sans-serif;
+  --font-display: var(--font-rubik), system-ui, sans-serif;
+  --font-sans: var(--font-rubik), system-ui, sans-serif;
   --font-hand: var(--font-playpen), var(--font-caveat), cursive;
 
   /* spacing rhythm for sections */
@@ -56,9 +53,8 @@
   --breakpoint-3xl: 112rem;
 }
 
-/* Russian headings read better in Cormorant; it carries the Cyrillic glyphs first. */
+/* the same family in Russian; only the handwriting accent takes its Cyrillic face first */
 :lang(ru) {
-  --font-display: var(--font-cormorant), var(--font-frank), "Times New Roman", serif;
   --font-hand: var(--font-caveat), var(--font-playpen), cursive;
 }
 
@@ -91,6 +87,12 @@ body::before {
 /* in the base layer, so a sticky or fixed class on one of these still wins */
 @layer base {
   main, header, footer, section { position: relative; z-index: 1; }
+}
+
+/* weights: headings 500, body and navigation 400, buttons 500 (a utility class on an element still wins) */
+@layer base {
+  h1, h2, h3 { font-weight: 500; }
+  button { font-weight: 500; }
 }
 
 h1, h2, h3, .font-display {

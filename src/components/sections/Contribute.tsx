@@ -14,7 +14,7 @@ export default function Contribute() {
           <Item as="span" className="label !text-blush">
             {t.contribute.eyebrow}
           </Item>
-          <Item as="h2" className="text-[clamp(2.3rem,4.8vw,4rem)] font-light leading-[1.1] text-ivory">
+          <Item as="h2" className="text-[clamp(2.3rem,4.8vw,4rem)] font-medium leading-[1.1] text-ivory">
             <span id="contribute-title">{t.contribute.title}</span>
           </Item>
           <Item as="p" className="max-w-lg text-lg leading-relaxed text-ivory/80">
